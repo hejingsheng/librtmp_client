@@ -229,7 +229,7 @@ namespace NetCore
 		}
 		if (uv_is_closing((uv_handle_t*)tcp_) == 0)
 		{
-			//libuv ÔÚloopÂÖÑ¯ÖÐ»á¼ì²â¹Ø±Õ¾ä±ú£¬delete»áµ¼ÖÂ³ÌÐòÒì³£ÍË³ö¡£
+			//libuv ï¿½ï¿½loopï¿½ï¿½Ñ¯ï¿½Ð»ï¿½ï¿½ï¿½Ø±Õ¾ï¿½ï¿½ï¿½ï¿½deleteï¿½áµ¼ï¿½Â³ï¿½ï¿½ï¿½ï¿½ì³£ï¿½Ë³ï¿½ï¿½ï¿½
 			uv_close((uv_handle_t*)tcp_, [](uv_handle_t* handle) {
 				auto data = static_cast<TcpSocket*>(handle->data);
 				data->onClosed();
@@ -1190,7 +1190,7 @@ namespace NetCore
 		}
 		if (uv_is_closing((uv_handle_t*)tcp_) == 0)
 		{
-			//libuv ÔÚloopÂÖÑ¯ÖÐ»á¼ì²â¹Ø±Õ¾ä±ú£¬delete»áµ¼ÖÂ³ÌÐòÒì³£ÍË³ö¡£
+			//libuv ï¿½ï¿½loopï¿½ï¿½Ñ¯ï¿½Ð»ï¿½ï¿½ï¿½Ø±Õ¾ï¿½ï¿½ï¿½ï¿½deleteï¿½áµ¼ï¿½Â³ï¿½ï¿½ï¿½ï¿½ì³£ï¿½Ë³ï¿½ï¿½ï¿½
 			uv_close((uv_handle_t*)tcp_, [](uv_handle_t* handle) {
 				auto data = static_cast<TcpSocketConn*>(handle->data);
 				data->onConnClosed();
@@ -1246,7 +1246,7 @@ namespace NetCore
 						if (opcode == CLOSE_FRAME)
 						{
 							DLOG("recv close msg\n");
-							len = wsProtocol_->encodeData("·þÎñ¶Ë½ÓÊÕ·¢Éú´íÎóEOF", strlen("·þÎñ¶Ë½ÓÊÕ·¢Éú´íÎóEOF"), CLOSE_FRAME, data);
+							len = wsProtocol_->encodeData("ï¿½ï¿½ï¿½ï¿½Ë½ï¿½ï¿½Õ·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½EOF", strlen("ï¿½ï¿½ï¿½ï¿½Ë½ï¿½ï¿½Õ·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½EOF"), CLOSE_FRAME, data);
 							//sendData(data.c_str(), len);
 							tlsTranport_->writeData(data.c_str(), data.length());
 							close();
@@ -1395,7 +1395,7 @@ namespace NetCore
 							if (opcode == CLOSE_FRAME)
 							{
 								DLOG("recv close msg\n");
-								len = wsProtocol_->encodeData("·þÎñ¶Ë½ÓÊÕ·¢Éú´íÎóEOF", strlen("·þÎñ¶Ë½ÓÊÕ·¢Éú´íÎóEOF"), CLOSE_FRAME, data);
+								len = wsProtocol_->encodeData("ï¿½ï¿½ï¿½ï¿½Ë½ï¿½ï¿½Õ·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½EOF", strlen("ï¿½ï¿½ï¿½ï¿½Ë½ï¿½ï¿½Õ·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½EOF"), CLOSE_FRAME, data);
 								//sendData(data.c_str(), len);
 								writeData(data);
 								close();
@@ -1430,7 +1430,7 @@ namespace NetCore
 		}
 		else if (size < 0)
 		{
-			// socket Òì³£ºó¶Ï¿ª ¶Ï¿ª³É¹¦ºóÉÏ±¨×´Ì¬¼´¿É£¬×Ô¼ºµÄÀàÖÐ½øÐÐ×´Ì¬Î¬»¤
+			// socket ï¿½ì³£ï¿½ï¿½Ï¿ï¿½ ï¿½Ï¿ï¿½ï¿½É¹ï¿½ï¿½ï¿½ï¿½Ï±ï¿½×´Ì¬ï¿½ï¿½ï¿½É£ï¿½ï¿½Ô¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð½ï¿½ï¿½ï¿½×´Ì¬Î¬ï¿½ï¿½
 			close();
 		}
 		else
