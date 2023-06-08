@@ -7,6 +7,7 @@
 #include "autofree.h"
 #include "logger.h"
 #include "netio.h"
+#include "string.h"
 
 // for hmacsha256
 #include "openssl/evp.h"
