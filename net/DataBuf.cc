@@ -182,3 +182,119 @@ void DataRingBuf::clear()
 	r_Pos_ = length_;
 	w_Pos_ = 0;
 }
+
+DataCacheBuf::DataCacheBuf()
+{
+    bytes = new char[MAX_CACHE_LEN];
+    nbytes = (MAX_CACHE_LEN);
+    //pos = bytes;
+    length = 0;
+}
+
+DataCacheBuf::~DataCacheBuf()
+{
+    if (bytes)
+    {
+        delete [] bytes;
+    }
+}
+
+char* DataCacheBuf::data()
+{
+    return bytes;
+}
+
+int DataCacheBuf::size()
+{
+    return nbytes;
+}
+
+int DataCacheBuf::len()
+{
+    return length;
+}
+
+bool DataCacheBuf::require(int required_size)
+{
+    if (required_size < 0)
+    {
+        return false;
+    }
+    return required_size <= length;
+}
+
+void DataCacheBuf::push_data(char *data, int size)
+{
+    if (length + size > MAX_CACHE_LEN)
+    {
+        //need realloc memory
+        return;
+    }
+    memcpy(bytes+length, data, size);
+    length += size;
+}
+
+void DataCacheBuf::pop_data(int len)
+{
+    memmove(bytes, bytes+len, length-len);
+    length -= len;
+}
+
+//char DataCacheBuf::read_1byte()
+//{
+//    return *p++;
+//}
+//
+//short DataCacheBuf::read_2byte()
+//{
+//    short value;
+//    char *pp = (char*)&value;
+//    pp[1] = *p++;
+//    pp[0] = *p++;
+//    return value;
+//}
+//
+//int DataCacheBuf::read_4byte()
+//{
+//    int value;
+//    char *pp = (char*)&value;
+//    pp[3] = *p++;
+//    pp[2] = *p++;
+//    pp[1] = *p++;
+//    pp[0] = *p++;
+//    return value;
+//}
+//
+//void DataCacheBuf::read_bytes(char *data, int size)
+//{
+//    memcpy(data, p, size);
+//    p += size;
+//}
+//
+//
+//void DataCacheBuf::write_1byte(char val)
+//{
+//    *p++ = val;
+//}
+//
+//void DataCacheBuf::write_2byte(short val)
+//{
+//    char *pp = (char*)&val;
+//    *p++ = pp[1];
+//    *p++ = pp[0];
+//}
+//
+//void DataCacheBuf::write_4byte(int val)
+//{
+//    char *pp = (char*)&val;
+//    *p++ = pp[3];
+//    *p++ = pp[2];
+//    *p++ = pp[1];
+//    *p++ = pp[0];
+//}
+//
+//void DataCacheBuf::write_bytes(char *data, int size)
+//{
+//    memcpy(p, data, size);
+//    p += size;
+//}

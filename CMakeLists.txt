@@ -62,6 +62,6 @@ add_executable(rtmp_client
         net/NetCommon.h
         net/NetCore.cc
         net/NetCore.h
-        main.cc)
+        main.cc rtmpclient.cc net/app_protocol/rtmp/rtmp_stack.cc net/app_protocol/rtmp/rtmp_stack.h)
 
 target_link_libraries(rtmp_client -lpthread -lcrypto -lssl -luv -lsrtp2 -lzlog -lglib-2.0 -lgthread-2.0)

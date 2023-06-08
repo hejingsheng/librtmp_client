@@ -2,6 +2,7 @@
 #define _DATA_BUF_H_
 
 const int MAX_DATA_LEN = 65535;
+const int MAX_CACHE_LEN = (8 * 1024);
 
 enum RingBufErrorCode
 {
@@ -30,6 +31,29 @@ private:
 	int r_Pos_;
 	int w_Pos_;
 	int length_;
+};
+
+class DataCacheBuf
+{
+public:
+    DataCacheBuf();
+    ~DataCacheBuf();
+
+public:
+    char *data();
+    int size();
+    int len();
+    bool require(int required_size);
+
+public:
+    void push_data(char *data, int size);
+    void pop_data(int len);
+
+private:
+    char *bytes;
+    char *pos;
+    int nbytes;
+    int length;
 };
 
 #endif
