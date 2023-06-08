@@ -1,15 +1,26 @@
-cmake_minimum_required(VERSION 3.16)
+cmake_minimum_required(VERSION 3.8)
 project(rtmp_client)
-
-set(CMAKE_OSX_ARCHITECTURES "arm64")
 
 set(CMAKE_CXX_STANDARD 11)
 
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+link_directories(/usr/local/lib)
+link_directories(/usr/local/openssl-1.1.1c/lib)
+
+include_directories(/usr/local/include)
+include_directories(/usr/local/openssl-1.1.1c/include)
+include_directories(/usr/include/glib-2.0)
+include_directories(/usr/lib/x86_64-linux-gnu/glib-2.0/include)
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+set(CMAKE_OSX_ARCHITECTURES "arm64")
 link_directories(/usr/local/lib)
 
 include_directories(/usr/local/include)
 include_directories(/usr/local/include/glib-2.0)
 include_directories(/usr/local/lib/glib-2.0/include)
+else()
+message(STATUS "Configuring on/for ${CMAKE_SYSTEM_NAME}")
+endif()
 
 include_directories(base)
 include_directories(net)
