@@ -2,8 +2,8 @@
 // Created by hejingsheng on 2023/6/7.
 //
 
-#ifndef RTMP_CLIENT_RTMP_STACK_H
-#define RTMP_CLIENT_RTMP_STACK_H
+#ifndef RTMP_CLIENT_RTMP_STACK_HANDSHAKE_H
+#define RTMP_CLIENT_RTMP_STACK_HANDSHAKE_H
 
 #include <string>
 
@@ -111,4 +111,4 @@ private:
 };
 
 
-#endif //RTMP_CLIENT_RTMP_STACK_H
+#endif //RTMP_CLIENT_RTMP_STACK_HANDSHAKE_H

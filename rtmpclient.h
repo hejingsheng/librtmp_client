@@ -7,7 +7,7 @@
 
 #include <string>
 #include "net/NetCore.h"
-#include "rtmp/rtmp_stack.h"
+#include "rtmp/rtmp_stack_handshake.h"
 #include "DataBuf.h"
 
 enum RtmpClientHandshakeStatus {
@@ -44,6 +44,7 @@ protected:
 
 private:
     void doHandshake(const char *data, int size);
+    void connectApp();
 
 private:
     std::string rtmp_app_;

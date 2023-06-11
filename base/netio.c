@@ -1,5 +1,6 @@
 #include <glib.h>
 #include "netio.h"
+#define SUPPORT_INT64 1
 
 static int rawio_netdata_8(void* dest,const void* src) {
 	*(uint8_t*)dest = *(uint8_t*)src;
@@ -57,8 +58,9 @@ static int rawio_netdata_32(void* _dest,const void* _src) {
 }
 
 #if SUPPORT_INT64
-static INLINE int rawio_netdata_64(void* _dest,const void* _src) {
-	register T_UINT8* dest = (T_UINT8*)_dest; register T_UINT8* src = (T_UINT8*)_src;
+static int rawio_netdata_64(void* _dest,const void* _src) {
+	register uint8_t* dest = (uint8_t*)_dest;
+	register uint8_t* src = (uint8_t*)_src;
 	dest[0] = src[7];
 	dest[1] = src[6];
 	dest[2] = src[5];
@@ -75,19 +77,19 @@ static INLINE int rawio_netdata_64(void* _dest,const void* _src) {
 #endif
 
 #if SUPPORT_INT64
-int write_uint64(T_UINT8* buffer,uint64_t d) {
+int write_uint64(uint8_t* buffer,uint64_t d) {
 	return rawio_netdata_64(buffer,&d);
 }
 
-int write_int64(T_UINT8* buffer,int64_t d) {
+int write_int64(uint8_t* buffer,int64_t d) {
 	return rawio_netdata_64(buffer,&d);
 }
 
-int read_uint64(const T_UINT8* buffer,uint64_t* d) {
+int read_uint64(const uint8_t* buffer,uint64_t* d) {
 	return rawio_netdata_64(d,buffer);
 }
 
-int read_int64(const T_UINT8* buffer,int64_t* d) {
+int read_int64(const uint8_t* buffer,int64_t* d) {
 	return rawio_netdata_64(d,buffer);
 }
 #endif
@@ -144,6 +146,7 @@ int read_int16(const uint8_t* buffer,int16_t* d) {
 int read_int32(const uint8_t* buffer,int32_t* d) {
 	return rawio_netdata_32(d,(void*)buffer);
 }
+
 
 
 

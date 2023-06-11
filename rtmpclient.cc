@@ -5,6 +5,7 @@
 #include <string>
 #include "rtmpclient.h"
 #include "base/logger.h"
+#include "app_protocol/rtmp/rtmp_stack_packet.h"
 
 RtmpPublishClient::RtmpPublishClient(std::string app, std::string live)
 {
@@ -88,10 +89,23 @@ void RtmpPublishClient::doHandshake(const char *data, int size)
                 rtmp_socket_->sendData(handshake.c2, 1536);
                 status_ = RTMP_HANDSHAKE_SEND_C2;
                 ILOG("rtmp handshake finish\n");
+                connectApp();
             }
             break;
         default:
             break;
     }
+}
 
+void RtmpPublishClient::connectApp()
+{
+    RtmpConnectPacket *pkg = new RtmpConnectPacket();
+    pkg->command_object->set("app", RtmpAmf0Any::str(rtmp_app_.c_str()));
+    pkg->command_object->set("type", RtmpAmf0Any::str("nonprivate"));
+    pkg->command_object->set("flashVer", RtmpAmf0Any::str("Jack He Rtmp Client(v0.0.1)"));
+    pkg->command_object->set("tcUrl", RtmpAmf0Any::str("rtmp://8.135.38.10:1935/live"));
+    uint8_t data[1024];
+    int ret;
+    ret = pkg->command_object->write(data, 1024);
+    ILOG("ret = %d\n", ret);
 }
