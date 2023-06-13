@@ -8,6 +8,8 @@
 #include <string>
 #include "net/NetCore.h"
 #include "rtmp/rtmp_stack_handshake.h"
+#include "app_protocol/rtmp/rtmp_stack_packet.h"
+#include "rtmp_transport.h"
 #include "DataBuf.h"
 
 enum RtmpClientHandshakeStatus {
@@ -47,12 +49,17 @@ private:
     void connectApp();
 
 private:
+    void sendRtmpPacket(RtmpBasePacket *pkg, int streamid);
+    void sendData(const char *data, int len);
+
+private:
     std::string rtmp_app_;
     std::string rtmp_live_;
 
 private:
     rtmp_handshake handshake;
     RtmpClientHandshakeStatus status_;
+    RtmpMessageTransport *rtmp_transport_;
 
 private:
     NetCore::IPAddr serveraddr_;

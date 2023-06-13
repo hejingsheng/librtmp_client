@@ -73,6 +73,14 @@ add_executable(rtmp_client
         net/NetCommon.h
         net/NetCore.cc
         net/NetCore.h
-        main.cc rtmpclient.cc net/app_protocol/rtmp/rtmp_stack_handshake.cc net/app_protocol/rtmp/rtmp_stack_handshake.h net/app_protocol/rtmp/rtmp_stack_amf0.h net/app_protocol/rtmp/rtmp_stack_amf0.cc net/app_protocol/rtmp/rtmp_stack_packet.cc net/app_protocol/rtmp/rtmp_stack_packet.h)
+        main.cc
+        rtmpclient.cc
+        rtmp_transport.cc
+        net/app_protocol/rtmp/rtmp_stack_handshake.cc
+        net/app_protocol/rtmp/rtmp_stack_handshake.h
+        net/app_protocol/rtmp/rtmp_stack_amf0.h
+        net/app_protocol/rtmp/rtmp_stack_amf0.cc
+        net/app_protocol/rtmp/rtmp_stack_packet.cc
+        net/app_protocol/rtmp/rtmp_stack_packet.h)
 
 target_link_libraries(rtmp_client -lpthread -lcrypto -lssl -luv -lsrtp2 -lzlog -lglib-2.0 -lgthread-2.0)

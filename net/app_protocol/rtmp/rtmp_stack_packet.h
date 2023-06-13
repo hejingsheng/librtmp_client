@@ -30,6 +30,13 @@
 #define RTMP_AMF0_ORIGINSTRICTARRAY  0x20
 #define RTMP_AMF0_INVALID  0x3f
 
+#define RTMP_CHUNK_FMT0_HEADER_MAX_SIZE 16
+#define RTMP_CHUNK_FMT1_HEADER_MAX_SIZE 12
+#define RTMP_CHUNK_FMT2_HEADER_MAX_SIZE 8
+#define RTMP_CHUNK_FMT3_HEADER_MAX_SIZE 5
+
+#define RTMP_EXTENDED_TIMESTAMP    0xffffff
+
 // 5. Protocol Control Messages
 // RTMP reserves message type IDs 1-7 for protocol control messages.
 // These messages contain information needed by the RTM Chunk Stream
@@ -129,12 +136,21 @@ public:
     // message header 8 bytes
     uint32_t msg_length; // 3 bytes
     uint8_t msg_type_id; // 1 byte
-    uint32_t  msg_stream_id; // 4 bytes
+    uint32_t msg_stream_id; // 4 bytes
 
 public:
     RtmpHeader();
     virtual ~RtmpHeader();
 
+public:
+    int encode(uint8_t *data, int size);
+    int decode(uint8_t *data, int len);
+
+private:
+    int encode_12byte_chunk_header(uint8_t *data, int size);
+    int encode_8byte_chunk_header(uint8_t *data, int size);
+    int encode_4byte_chunk_header(uint8_t *data, int size);
+    int encode_1byte_chunk_header(uint8_t *data, int size);
 };
 
 class RtmpBasePacket
@@ -148,13 +164,18 @@ public:
     }
 
 public:
-    virtual int encode(char *payload, int size) = 0;
-    virtual int decode(char *data, int len) = 0;
+    virtual int encode(uint8_t *&payload, int &size) ;
+    virtual RtmpHeader* get_header();
+    virtual void set_header(RtmpHeader *h);
+
+public:
+    virtual int encode_pkg(uint8_t *payload, int size) = 0;
+    virtual int decode(uint8_t *data, int len) = 0;
+    virtual int get_pkg_len() = 0;
 
 public:
     virtual int get_cs_id() = 0;
     virtual int get_msg_type() = 0;
-    virtual int get_stream_id() = 0;
 
 protected:
     RtmpHeader header;
@@ -164,7 +185,7 @@ class RtmpConnectPacket : public RtmpBasePacket
 {
 public:
     std::string command_name;
-    uint32_t number;
+    double number;
     RtmpAmf0Object *command_object;
 
 public:
@@ -172,11 +193,13 @@ public:
     virtual ~RtmpConnectPacket();
 
 public:
-    virtual int encode(char *payload, int size);
-    virtual int decode(char *data, int len);
+    virtual int decode(uint8_t *data, int len);
+    virtual int get_pkg_len();
     virtual int get_cs_id();
     virtual int get_msg_type();
-    virtual int get_stream_id();
+
+public:
+    virtual int encode_pkg(uint8_t *payload, int size);
 };
 
 

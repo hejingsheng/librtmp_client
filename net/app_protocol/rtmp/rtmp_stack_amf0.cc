@@ -1369,6 +1369,7 @@ int rtmp_amf0_read_string(uint8_t *data, int len, string& value)
 {
     // marker
     int offset = 0;
+    int ret = 0;
 
     if (len < 1)
     {
@@ -1381,21 +1382,33 @@ int rtmp_amf0_read_string(uint8_t *data, int len, string& value)
         //return srs_error_new(ERROR_RTMP_AMF0_DECODE, "String invalid marker=%#x", marker);
         return -1;
     }
-
-    return rtmp_amf0_read_utf8(data+offset, len-1, value);
+    ret = rtmp_amf0_read_utf8(data+offset, len-1, value);
+    if (ret < 0)
+    {
+        return ret;
+    }
+    offset += ret;
+    return offset;
 }
 
 int rtmp_amf0_write_string(uint8_t *data, int len, string value)
 {   
     // marker
     int offset = 0;
+    int ret = 0;
     if (len < 1)
     {
         return -1;
     }
     data[offset] = RTMP_AMF0_String;
     offset++;
-    return rtmp_amf0_write_utf8(data+offset, len-1, value);
+    ret = rtmp_amf0_write_utf8(data+offset, len-1, value);
+    if (ret < 0)
+    {
+        return ret;
+    }
+    offset += ret;
+    return offset;
 }
 
 int rtmp_amf0_read_boolean(uint8_t *data, int len, bool& value)
