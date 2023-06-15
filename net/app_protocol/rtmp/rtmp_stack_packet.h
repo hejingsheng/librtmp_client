@@ -30,6 +30,11 @@
 #define RTMP_AMF0_ORIGINSTRICTARRAY  0x20
 #define RTMP_AMF0_INVALID  0x3f
 
+#define RTMP_CHUNK_FMT0_TYPE 0
+#define RTMP_CHUNK_FMT1_TYPE 1
+#define RTMP_CHUNK_FMT2_TYPE 2
+#define RTMP_CHUNK_FMT3_TYPE 3
+
 #define RTMP_CHUNK_FMT0_HEADER_MAX_SIZE 16
 #define RTMP_CHUNK_FMT1_HEADER_MAX_SIZE 12
 #define RTMP_CHUNK_FMT2_HEADER_MAX_SIZE 8
@@ -130,7 +135,7 @@ class RtmpHeader
 public:
     // base header 1 byte
     uint8_t chunk_type;   // 2 bits
-    uint8_t chunk_stream_id;  // 6 bits
+    uint32_t chunk_stream_id;  // 6 bits
     // timestamp 3 bytes;
     uint32_t timestamp;  // 3 bytes
     // message header 8 bytes
@@ -147,10 +152,37 @@ public:
     int decode(uint8_t *data, int len);
 
 private:
-    int encode_12byte_chunk_header(uint8_t *data, int size);
-    int encode_8byte_chunk_header(uint8_t *data, int size);
-    int encode_4byte_chunk_header(uint8_t *data, int size);
-    int encode_1byte_chunk_header(uint8_t *data, int size);
+    int decode_base_header(uint8_t *data, int length, uint8_t &fmt, uint32_t &cs_id);
+    int decode_msg_header(uint8_t *data, int length);
+
+private:
+    int encode_fmt0_chunk_header(uint8_t *data, int size);
+    int encode_fmt1_chunk_header(uint8_t *data, int size);
+    int encode_fmt2_chunk_header(uint8_t *data, int size);
+    int encode_fmt3_chunk_header(uint8_t *data, int size);
+};
+
+class RtmpChunkData
+{
+
+public:
+    RtmpChunkData();
+    virtual ~RtmpChunkData();
+
+public:
+    void create_payload(int length);
+    void copy_payload(uint8_t *data, int len);
+    uint32_t get_current_len() const { return current_payload_len; }
+    void reset() { current_payload_len = 0; payload = nullptr;}
+    uint8_t* getPaylaod() const { return payload; }
+
+public:
+    RtmpHeader h;
+    uint32_t time_delta;
+
+private:
+    uint8_t *payload;
+    uint32_t current_payload_len;
 };
 
 class RtmpBasePacket
@@ -165,8 +197,6 @@ public:
 
 public:
     virtual int encode(uint8_t *&payload, int &size) ;
-    virtual RtmpHeader* get_header();
-    virtual void set_header(RtmpHeader *h);
 
 public:
     virtual int encode_pkg(uint8_t *payload, int size) = 0;
@@ -176,9 +206,6 @@ public:
 public:
     virtual int get_cs_id() = 0;
     virtual int get_msg_type() = 0;
-
-protected:
-    RtmpHeader header;
 };
 
 class RtmpConnectPacket : public RtmpBasePacket
@@ -202,5 +229,122 @@ public:
     virtual int encode_pkg(uint8_t *payload, int size);
 };
 
+class RtmpSetWindowAckSizePacket : public RtmpBasePacket
+{
+public:
+    int32_t window_ack_size;
+
+public:
+    RtmpSetWindowAckSizePacket();
+    virtual ~RtmpSetWindowAckSizePacket();
+
+public:
+    virtual int decode(uint8_t *data, int len);
+    virtual int get_pkg_len();
+    virtual int get_cs_id();
+    virtual int get_msg_type();
+
+public:
+    virtual int encode_pkg(uint8_t *payload, int size);
+};
+
+class RtmpAcknowledgementPacket : public RtmpBasePacket
+{
+public:
+    uint32_t sequence_number;
+
+public:
+    RtmpAcknowledgementPacket();
+    virtual ~RtmpAcknowledgementPacket();
+
+public:
+    virtual int decode(uint8_t *data, int len);
+    virtual int get_pkg_len();
+    virtual int get_cs_id();
+    virtual int get_msg_type();
+
+public:
+    virtual int encode_pkg(uint8_t *payload, int size);
+
+};
+
+class RtmpSetChunkSizePacket : public RtmpBasePacket
+{
+public:
+    int32_t chunk_size;
+
+public:
+    RtmpSetChunkSizePacket();
+    virtual ~RtmpSetChunkSizePacket();
+
+public:
+    virtual int decode(uint8_t *data, int len);
+    virtual int get_pkg_len();
+    virtual int get_cs_id();
+    virtual int get_msg_type();
+
+public:
+    virtual int encode_pkg(uint8_t *payload, int size);
+};
+
+enum RtmpPeerBandwidthType
+{
+    RtmpPeerBandwidthHard = 0,
+    RtmpPeerBandwidthSoft = 1,
+    RtmpPeerBandwidthDynamic = 0,
+};
+
+class RtmpSetPeerBandwidthPacket : public RtmpBasePacket
+{
+public:
+    int32_t bandwidth;
+    uint8_t type;
+
+public:
+    RtmpSetPeerBandwidthPacket();
+    virtual ~RtmpSetPeerBandwidthPacket();
+
+public:
+    virtual int decode(uint8_t *data, int len);
+    virtual int get_pkg_len();
+    virtual int get_cs_id();
+    virtual int get_msg_type();
+
+public:
+    virtual int encode_pkg(uint8_t *payload, int size);
+};
+
+enum RtmpPCUCEventType
+{
+    RtmpPCUCStreamBegin = 0x00,
+    RtmpPCUCStreamEof = 0x01,
+    RtmpPCUCStreamDry = 0x02,
+    RtmpPCUCSetBufferLength = 0x03,
+    RtmpPCUCStreamIsRecorded = 0x04,
+    RtmpPCUCPingRequest = 0x06,
+    RtmpPCUCPingResponse = 0x07,
+    RtmpPCUCFmsEvent0 = 0x1a,
+};
+
+class RtmpUserControlPacket : public RtmpBasePacket
+{
+public:
+    int16_t event_type;
+    int32_t event_data;
+    int32_t extra_data;
+
+public:
+    RtmpUserControlPacket();
+    virtual ~RtmpUserControlPacket();
+
+public:
+    virtual int decode(uint8_t *data, int len);
+    virtual int get_pkg_len();
+    virtual int get_cs_id();
+    virtual int get_msg_type();
+
+public:
+    virtual int encode_pkg(uint8_t *payload, int size);
+};
 
 #endif //RTMP_CLIENT_RTMP_STACK_PACKET_H

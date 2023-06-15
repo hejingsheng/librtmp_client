@@ -66,7 +66,7 @@ int RtmpPublishClient::onRecvData(const char *data, int size, const struct socka
     }
     else
     {
-        ILOG("recv %d data\n", size);
+        processData(data, size);
     }
     return 0;
 }
@@ -125,4 +125,25 @@ void RtmpPublishClient::sendRtmpPacket(RtmpBasePacket *pkg, int streamid)
 void RtmpPublishClient::sendData(const char *data, int len)
 {
     rtmp_socket_->sendData(data, len);
+}
+
+int RtmpPublishClient::processData(const char *data, int length)
+{
+    RtmpMessage *msg = nullptr;
+    int ret = 0;
+    data_cache_->push_data((char*)data, length);
+    while (data_cache_->len() > 0)
+    {
+        ret = rtmp_transport_->recvRtmpMessage(data_cache_->data(), data_cache_->len(), &msg);
+        if (ret < 0)
+        {
+            return ret;
+        }
+        data_cache_->pop_data(ret);
+        if (msg != nullptr) {
+            ILOG("msg type=%d\n", msg->rtmp_header.msg_type_id);
+            //processRtmpMsg(msg);
+        }
+    }
+    return ret;
 }
