@@ -52,6 +52,8 @@ private:
     void sendRtmpPacket(RtmpBasePacket *pkg, int streamid);
     void sendData(const char *data, int len);
     int processData(const char *data, int length);
+    int processRtmpMsg(RtmpMessage *msg);
+    int decode_msg(RtmpHeader *header, uint8_t *body, int bodylen);
 
 private:
     std::string rtmp_app_;

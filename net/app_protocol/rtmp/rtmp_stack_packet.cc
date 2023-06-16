@@ -492,6 +492,118 @@ int RtmpConnectPacket::get_msg_type()
     return RTMP_MSG_AMF0CommandMessage;
 }
 
+RtmpConnectResponsePacket::RtmpConnectResponsePacket()
+{
+    command_name = "_result";
+    number = 1;
+    object = RtmpAmf0Any::object();
+    info = RtmpAmf0Any::object();
+}
+
+RtmpConnectResponsePacket::~RtmpConnectResponsePacket()
+{
+    delete object;
+    delete info;
+}
+
+int RtmpConnectResponsePacket::decode(uint8_t *data, int len)
+{
+    int ret;
+    int offset = 0;
+
+    ret = rtmp_amf0_read_string(data+offset, len-offset, command_name);
+    if (ret < 0)
+    {
+        return -1;
+    }
+    if (command_name.empty() || command_name != "_result")
+    {
+        return -2;
+    }
+    offset += ret;
+    ret = rtmp_amf0_read_number(data+offset, len-offset, number);
+    if (ret < 0)
+    {
+        return -1;
+    }
+    if (offset < len)
+    {
+        RtmpAmf0Any *p = nullptr;
+        ret = rtmp_amf0_read_any(data+offset, len-offset, &p);
+        if (ret < 0)
+        {
+            return -1;
+        }
+        offset += ret;
+        if (!p->is_object())
+        {
+            delete p;
+        }
+        else
+        {
+            if (object)
+            {
+                delete object;
+            }
+            object = p->to_object();
+        }
+    }
+    ret = info->read(data+offset, len-offset);
+    if (ret < 0)
+    {
+        return ret;
+    }
+    offset += ret;
+    return offset;
+}
+
+int RtmpConnectResponsePacket::get_pkg_len()
+{
+    return RtmpAmf0Size::str(command_name) + RtmpAmf0Size::number() + RtmpAmf0Size::object(object) + RtmpAmf0Size::object(info);
+}
+
+int RtmpConnectResponsePacket::get_cs_id()
+{
+    return RTMP_CID_OverConnection;
+}
+
+int RtmpConnectResponsePacket::get_msg_type()
+{
+    return RTMP_MSG_AMF0CommandMessage;
+}
+
+int RtmpConnectResponsePacket::encode_pkg(uint8_t *payload, int size)
+{
+    int ret;
+    int offset = 0;
+
+    ret = rtmp_amf0_write_string(payload+offset, size-offset, command_name);
+    if (ret < 0)
+    {
+        return ret;
+    }
+    offset += ret;
+    ret = rtmp_amf0_write_number(payload+offset, size-offset, number);
+    if (ret < 0)
+    {
+        return ret;
+    }
+    offset += ret;
+    ret = object->write(payload+offset, size-offset);
+    if (ret < 0)
+    {
+        return ret;
+    }
+    offset += ret;
+    ret = info->write(payload+offset, size-offset);
+    if (ret < 0)
+    {
+        return ret;
+    }
+    offset += ret;
+    return offset;
+}
+
 RtmpSetWindowAckSizePacket::RtmpSetWindowAckSizePacket()
 {
     window_ack_size = 0;
@@ -757,4 +869,639 @@ int RtmpUserControlPacket::encode_pkg(uint8_t *payload, int size)
         offset += write_int32(payload+offset, extra_data);
     }
     return offset;
+}
+
+RtmpCallPacket::RtmpCallPacket() {
+    command_name = "";
+    number = 0;
+    object = nullptr;
+    args = nullptr;
+}
+
+RtmpCallPacket::~RtmpCallPacket() {
+    if (object) {
+        delete object;
+    }
+    if (args) {
+        delete args;
+    }
+}
+
+int RtmpCallPacket::decode(uint8_t *data, int len) {
+    int ret;
+    int offset =- 0;
+
+    ret = rtmp_amf0_read_string(data+offset, len-offset, command_name);
+    if (ret < 0) {
+        return ret;
+    }
+    offset += ret;
+    if (command_name.empty()) {
+        return -2;
+    }
+    ret = rtmp_amf0_read_number(data+offset, len-offset, number);
+    if (ret < 0) {
+        return -1;
+    }
+    offset += ret;
+    if (object) {
+        delete object;
+    }
+    ret = RtmpAmf0Any::discovery(data+offset, len-offset, &object);
+    if (ret < 0) {
+        return ret;
+    }
+    ret = object->read(data+offset, len-offset);
+    if (ret < 0) {
+        return ret;
+    }
+    offset += ret;
+    if (offset < len) {
+        if (args) {
+            delete args;
+        }
+        ret = RtmpAmf0Any::discovery(data+offset, len-offset, &args);
+        if (ret < 0) {
+            return ret;
+        }
+        ret = args->read(data+offset, len-offset);
+        if (ret < 0) {
+            return ret;
+        }
+        offset += ret;
+    }
+    return offset;
+}
+
+int RtmpCallPacket::get_pkg_len() {
+    int size = 0;
+
+    size += RtmpAmf0Size::str(command_name) + RtmpAmf0Size::number();
+    if (object) {
+        size += RtmpAmf0Size::any(object);
+    }
+    if (args) {
+        size += RtmpAmf0Size::any(args);
+    }
+    return size;
+}
+
+int RtmpCallPacket::get_cs_id() {
+    return RTMP_CID_OverConnection;
+}
+
+int RtmpCallPacket::get_msg_type() {
+    return RTMP_MSG_AMF0CommandMessage;
+}
+
+int RtmpCallPacket::encode_pkg(uint8_t *payload, int size) {
+    int ret;
+    int offset = 0;
+
+    ret = rtmp_amf0_write_string(payload+offset, size-offset, command_name);
+    if (ret < 0) {
+        return -1;
+    }
+    offset += ret;
+
+    ret = rtmp_amf0_write_number(payload+offset, size-offset, number);
+    if (ret < 0) {
+        return -1;
+    }
+    offset += ret;
+
+    if (object) {
+        ret = object->write(payload+offset, size-offset);
+        if (ret < 0) {
+            return -1;
+        }
+        offset += ret;
+    }
+
+    if (args) {
+        ret = args->write(payload+offset, size-offset);
+        if (ret < 0) {
+            return -1;
+        }
+        offset += ret;
+    }
+    return offset;
+}
+
+RtmpCallResponsePacket::RtmpCallResponsePacket(double id) {
+    command_name = "_result";
+    number = id;
+    object = nullptr;
+    response = nullptr;
+}
+
+RtmpCallResponsePacket::~RtmpCallResponsePacket() {
+    if (object) {
+        delete object;
+    }
+    if (response) {
+        delete response;
+    }
+}
+
+int RtmpCallResponsePacket::decode(uint8_t *data, int len) {
+    return 0;
+}
+
+int RtmpCallResponsePacket::get_pkg_len() {
+    int size = 0;
+
+    size += RtmpAmf0Size::str(command_name) + RtmpAmf0Size::number();
+    if (object) {
+        size += RtmpAmf0Size::any(object);
+    }
+    if (response) {
+        size += RtmpAmf0Size::any(response);
+    }
+    return size;
+}
+
+int RtmpCallResponsePacket::get_cs_id() {
+    return RTMP_CID_OverConnection;
+}
+
+int RtmpCallResponsePacket::get_msg_type() {
+    return RTMP_MSG_AMF0CommandMessage;
+}
+
+int RtmpCallResponsePacket::encode_pkg(uint8_t *payload, int size) {
+    int ret;
+    int offset = 0;
+
+    ret = rtmp_amf0_write_string(payload+offset, size-offset, command_name);
+    if (ret < 0) {
+        return ret;
+    }
+    offset += ret;
+
+    ret = rtmp_amf0_write_number(payload+offset, size-offset, number);
+    if (ret < 0) {
+        return ret;
+    }
+    offset += ret;
+
+    if (object) {
+        ret = object->write(payload+offset, size-offset);
+        if (ret < 0) {
+            return ret;
+        }
+        offset += ret;
+    }
+    if (response) {
+        ret = response->write(payload+offset, size-offset);
+        if (ret < 0) {
+            return ret;
+        }
+        offset += ret;
+    }
+    return offset;
+}
+
+RtmpCreateStreamPacket::RtmpCreateStreamPacket() {
+    command_name = "createStream";
+    number = 2;
+    object = RtmpAmf0Any::null();
+}
+
+RtmpCreateStreamPacket::~RtmpCreateStreamPacket() {
+    if (object) {
+        delete object;
+    }
+}
+
+int RtmpCreateStreamPacket::decode(uint8_t *data, int len) {
+    int ret;
+    int offset = 0;
+
+    ret = rtmp_amf0_read_string(data+offset, len-offset, command_name);
+    if (ret < 0) {
+        return ret;
+    }
+    offset += ret;
+    if (command_name.empty() || command_name != "createStream") {
+        return -2;
+    }
+    ret = rtmp_amf0_read_number(data+offset, len-offset, number);
+    if (ret < 0) {
+        return ret;
+    }
+    offset += ret;
+    ret = rtmp_amf0_read_null(data+offset, len-offset);
+    if (ret < 0) {
+        return ret;
+    }
+    offset += ret;
+    return offset;
+}
+
+int RtmpCreateStreamPacket::get_pkg_len() {
+    return RtmpAmf0Size::str(command_name) + RtmpAmf0Size::number() + RtmpAmf0Size::null();
+}
+
+int RtmpCreateStreamPacket::get_cs_id() {
+    return RTMP_CID_OverConnection;
+}
+
+int RtmpCreateStreamPacket::get_msg_type() {
+    return RTMP_MSG_AMF0CommandMessage;
+}
+
+int RtmpCreateStreamPacket::encode_pkg(uint8_t *payload, int size) {
+    int ret;
+    int offset = 0;
+
+    ret = rtmp_amf0_write_string(payload+offset, size-offset, command_name);
+    if (ret < 0) {
+        return ret;
+    }
+    offset += ret;
+
+    ret = rtmp_amf0_write_number(payload+offset, size-offset, number);
+    if (ret < 0) {
+        return ret;
+    }
+    offset += ret;
+
+    ret = rtmp_amf0_write_null(payload+offset, size-offset);
+    if (ret < 0) {
+        return ret;
+    }
+    offset += ret;
+    return offset;
+}
+
+RtmpCreateStreamResponsePacket::RtmpCreateStreamResponsePacket(double id, double streamid) {
+    command_name = "_result";
+    number = id;
+    object = RtmpAmf0Any::null();
+    streamid_ = streamid;
+}
+
+RtmpCreateStreamResponsePacket::~RtmpCreateStreamResponsePacket() {
+    if (object) {
+        delete object;
+    }
+}
+
+int RtmpCreateStreamResponsePacket::decode(uint8_t *data, int len) {
+    int ret;
+    int offset = 0;
+
+    ret = rtmp_amf0_read_string(data+offset, len-offset, command_name);
+    if (ret < 0) {
+        return ret;
+    }
+    if (command_name.empty() || command_name != "_result") {
+        return -2;
+    }
+    offset += ret;
+    ret = rtmp_amf0_read_number(data+offset, len-offset, number);
+    if (ret < 0) {
+        return ret;
+    }
+    offset += ret;
+    ret = rtmp_amf0_read_null(data+offset, len-offset);
+    if (ret < 0) {
+        return ret;
+    }
+    offset += ret;
+    ret = rtmp_amf0_read_number(data+offset, len-offset, streamid_);
+    if (ret < 0) {
+        return ret;
+    }
+    offset += ret;
+    return offset;
+}
+
+int RtmpCreateStreamResponsePacket::get_pkg_len() {
+    return RtmpAmf0Size::str(command_name) + RtmpAmf0Size::number() + RtmpAmf0Size::null() + RtmpAmf0Size::number();
+}
+
+int RtmpCreateStreamResponsePacket::get_cs_id() {
+    return RTMP_CID_OverConnection;
+}
+
+int RtmpCreateStreamResponsePacket::get_msg_type() {
+    return RTMP_MSG_AMF0CommandMessage;
+}
+
+int RtmpCreateStreamResponsePacket::encode_pkg(uint8_t *payload, int size) {
+    int ret;
+    int offset = 0;
+
+    ret = rtmp_amf0_write_string(payload+offset, size-offset, command_name);
+    if (ret < 0) {
+        return ret;
+    }
+    offset += ret;
+    ret = rtmp_amf0_write_number(payload+offset, size-offset, number);
+    if (ret < 0) {
+        return ret;
+    }
+    offset += ret;
+    ret = rtmp_amf0_write_null(payload+offset, size-offset);
+    if (ret < 0) {
+        return ret;
+    }
+    offset += ret;
+    ret = rtmp_amf0_write_number(payload+offset, size-offset, streamid_);
+    if (ret < 0) {
+        return ret;
+    }
+    offset += ret;
+    return offset;
+}
+
+RtmpCloseStreamPacket::RtmpCloseStreamPacket() {
+    command_name = "closeStream";
+    number = 0;
+    object = RtmpAmf0Any::null();
+}
+
+RtmpCloseStreamPacket::~RtmpCloseStreamPacket() {
+    if (object) {
+        delete object;
+    }
+}
+
+int RtmpCloseStreamPacket::decode(uint8_t *data, int len) {
+    int ret;
+    int offset = 0;
+
+    ret = rtmp_amf0_read_string(data+offset, len-offset, command_name);
+    if (ret < 0) {
+        return ret;
+    }
+    offset += ret;
+    ret = rtmp_amf0_read_number(data+offset, len-offset, number);
+    if (ret < 0) {
+        return ret;
+    }
+    offset += ret;
+    ret = rtmp_amf0_read_null(data+offset, len-offset);
+    if (ret < 0) {
+        return ret;
+    }
+    offset += ret;
+    return offset;
+}
+
+int RtmpCloseStreamPacket::get_pkg_len() {
+    return 0;
+}
+
+int RtmpCloseStreamPacket::get_cs_id() {
+    return 0;
+}
+
+int RtmpCloseStreamPacket::get_msg_type() {
+    return 0;
+}
+
+int RtmpCloseStreamPacket::encode_pkg(uint8_t *payload, int size) {
+    return 0;
+}
+
+RtmpFMLEStartPacket::RtmpFMLEStartPacket() {
+    command_name = "releaseStream";
+    number = 0;
+    object = RtmpAmf0Any::null();
+}
+
+RtmpFMLEStartPacket::~RtmpFMLEStartPacket() {
+    if (object) {
+        delete object;
+    }
+}
+
+int RtmpFMLEStartPacket::decode(uint8_t *data, int len) {
+    int ret;
+    int offset = 0;
+
+    ret = rtmp_amf0_read_string(data+offset, len-offset, command_name);
+    if (ret < 0) {
+        return ret;
+    }
+    bool command_name_invalid = (command_name != "releaseStream" && command_name != "FCPublish" && command_name != "FCUnpublish");
+    if (command_name.empty() || command_name_invalid) {
+        return -2;
+    }
+    offset += ret;
+    ret = rtmp_amf0_read_number(data+offset, len-offset, number);
+    if (ret < 0) {
+        return ret;
+    }
+    offset += ret;
+    ret = rtmp_amf0_read_null(data+offset, len-offset);
+    if (ret < 0) {
+        return ret;
+    }
+    offset += ret;
+    ret = rtmp_amf0_read_string(data+offset, len-offset, stream_name);
+    if (ret < 0) {
+        return ret;
+    }
+    offset += ret;
+    return offset;
+}
+
+int RtmpFMLEStartPacket::get_pkg_len() {
+    return RtmpAmf0Size::str(command_name) + RtmpAmf0Size::number() + RtmpAmf0Size::null() + RtmpAmf0Size::str(stream_name);
+}
+
+int RtmpFMLEStartPacket::get_cs_id() {
+    return RTMP_CID_OverConnection;
+}
+
+int RtmpFMLEStartPacket::get_msg_type() {
+    return RTMP_MSG_AMF0CommandMessage;
+}
+
+int RtmpFMLEStartPacket::encode_pkg(uint8_t *payload, int size) {
+    int ret;
+    int offset = 0;
+
+    ret = rtmp_amf0_write_string(payload+offset, size-offset, command_name);
+    if (ret < 0) {
+        return ret;
+    }
+    offset += ret;
+    ret = rtmp_amf0_write_number(payload+offset, size-offset, number);
+    if (ret < 0) {
+        return ret;
+    }
+    offset += ret;
+    ret = rtmp_amf0_write_null(payload+offset, size-offset);
+    if (ret < 0) {
+        return ret;
+    }
+    offset += ret;
+    ret = rtmp_amf0_write_string(payload+offset, size-offset, stream_name);
+    if (ret < 0) {
+        return ret;
+    }
+    offset += ret;
+    return offset;
+}
+
+RtmpFMLEStartPacket *RtmpFMLEStartPacket::create_release_stream(std::string stream) {
+    RtmpFMLEStartPacket *packet = new RtmpFMLEStartPacket();
+    packet->command_name = "releaseStream";
+    packet->number = 2;
+    packet->stream_name = stream;
+    return packet;
+}
+
+RtmpFMLEStartPacket *RtmpFMLEStartPacket::create_FC_publish(std::string stream) {
+    RtmpFMLEStartPacket *packet = new RtmpFMLEStartPacket();
+    packet->command_name = "FCPublish";
+    packet->number = 3;
+    packet->stream_name = stream;
+    return packet;
+}
+
+RtmpFMLEStartResponsePacket::RtmpFMLEStartResponsePacket(double id) {
+    command_name = "_result";
+    number = id;
+    object = RtmpAmf0Any::null();
+    args = RtmpAmf0Any::undefined();
+}
+
+RtmpFMLEStartResponsePacket::~RtmpFMLEStartResponsePacket() {
+    if (object) {
+        delete object;
+    }
+    if (args) {
+        delete args;
+    }
+}
+
+int RtmpFMLEStartResponsePacket::decode(uint8_t *data, int len) {
+    int ret;
+    int offset = 0;
+
+    ret = rtmp_amf0_read_string(data+offset, len-offset, command_name);
+    if (ret < 0) {
+        return ret;
+    }
+    if (command_name.empty() || command_name != "_result") {
+        return -2;
+    }
+    offset += ret;
+    ret = rtmp_amf0_read_number(data+offset, len-offset, number);
+    if (ret < 0) {
+        return ret;
+    }
+    offset += ret;
+    ret = rtmp_amf0_read_null(data+offset, len-offset);
+    if (ret < 0) {
+        return ret;
+    }
+    offset += ret;
+    ret = rtmp_amf0_read_undefined(data+offset, len-offset);
+    if (ret < 0) {
+        return ret;
+    }
+    offset += ret;
+    return offset;
+}
+
+int RtmpFMLEStartResponsePacket::get_pkg_len() {
+    return RtmpAmf0Size::str(command_name) + RtmpAmf0Size::number() + RtmpAmf0Size::null() + RtmpAmf0Size::undefined();
+}
+
+int RtmpFMLEStartResponsePacket::get_cs_id() {
+    return RTMP_CID_OverConnection;
+}
+
+int RtmpFMLEStartResponsePacket::get_msg_type() {
+    return RTMP_MSG_AMF0CommandMessage;
+}
+
+int RtmpFMLEStartResponsePacket::encode_pkg(uint8_t *payload, int size) {
+    int ret;
+    int offset = 0;
+
+    ret = rtmp_amf0_write_string(payload+offset, size-offset, command_name);
+    if (ret < 0) {
+        return ret;
+    }
+    offset += ret;
+    ret = rtmp_amf0_write_number(payload+offset, size-offset, number);
+    if (ret < 0) {
+        return ret;
+    }
+    offset += ret;
+    ret = rtmp_amf0_write_null(payload+offset, size-offset);
+    if (ret < 0) {
+        return ret;
+    }
+    offset += ret;
+    ret = rtmp_amf0_write_undefined(payload+offset, size-offset);
+    if (ret < 0) {
+        return ret;
+    }
+    offset += ret;
+    return offset;
+}
+
+RtmpPublishPacket::RtmpPublishPacket() {
+
+}
+
+RtmpPublishPacket::~RtmpPublishPacket() {
+
+}
+
+int RtmpPublishPacket::decode(uint8_t *data, int len) {
+    return 0;
+}
+
+int RtmpPublishPacket::get_pkg_len() {
+    return 0;
+}
+
+int RtmpPublishPacket::get_cs_id() {
+    return 0;
+}
+
+int RtmpPublishPacket::get_msg_type() {
+    return 0;
+}
+
+int RtmpPublishPacket::encode_pkg(uint8_t *payload, int size) {
+    return 0;
+}
+
+RtmpPausePacket::RtmpPausePacket() {
+
+}
+
+RtmpPausePacket::~RtmpPausePacket() {
+
+}
+
+int RtmpPausePacket::decode(uint8_t *data, int len) {
+    return 0;
+}
+
+int RtmpPausePacket::get_pkg_len() {
+    return 0;
+}
+
+int RtmpPausePacket::get_cs_id() {
+    return 0;
+}
+
+int RtmpPausePacket::get_msg_type() {
+    return 0;
+}
+
+int RtmpPausePacket::encode_pkg(uint8_t *payload, int size) {
+    return 0;
 }

@@ -229,6 +229,28 @@ public:
     virtual int encode_pkg(uint8_t *payload, int size);
 };
 
+class RtmpConnectResponsePacket : public RtmpBasePacket
+{
+public:
+    std::string command_name;
+    double number;
+    RtmpAmf0Object *object;
+    RtmpAmf0Object *info;
+
+public:
+    RtmpConnectResponsePacket();
+    virtual ~RtmpConnectResponsePacket();
+
+public:
+    virtual int decode(uint8_t *data, int len);
+    virtual int get_pkg_len();
+    virtual int get_cs_id();
+    virtual int get_msg_type();
+
+public:
+    virtual int encode_pkg(uint8_t *payload, int size);
+};
+
 class RtmpSetWindowAckSizePacket : public RtmpBasePacket
 {
 public:
@@ -336,6 +358,359 @@ public:
 public:
     RtmpUserControlPacket();
     virtual ~RtmpUserControlPacket();
+
+public:
+    virtual int decode(uint8_t *data, int len);
+    virtual int get_pkg_len();
+    virtual int get_cs_id();
+    virtual int get_msg_type();
+
+public:
+    virtual int encode_pkg(uint8_t *payload, int size);
+};
+
+class RtmpCallPacket : public RtmpBasePacket
+{
+public:
+    std::string command_name;
+    double number;
+    RtmpAmf0Any *object;
+    RtmpAmf0Any *args;
+
+public:
+    RtmpCallPacket();
+    virtual ~RtmpCallPacket();
+
+public:
+    virtual int decode(uint8_t *data, int len);
+    virtual int get_pkg_len();
+    virtual int get_cs_id();
+    virtual int get_msg_type();
+
+public:
+    virtual int encode_pkg(uint8_t *payload, int size);
+};
+
+class RtmpCallResponsePacket : public RtmpBasePacket
+{
+public:
+    std::string command_name;
+    double number;
+    RtmpAmf0Any *object;
+    RtmpAmf0Any *response;
+
+public:
+    RtmpCallResponsePacket(double id);
+    virtual ~RtmpCallResponsePacket();
+
+public:
+    virtual int decode(uint8_t *data, int len);
+    virtual int get_pkg_len();
+    virtual int get_cs_id();
+    virtual int get_msg_type();
+
+public:
+    virtual int encode_pkg(uint8_t *payload, int size);
+};
+
+class RtmpCreateStreamPacket : public RtmpBasePacket
+{
+public:
+    std::string command_name;
+    double number;
+    RtmpAmf0Any *object;
+
+public:
+    RtmpCreateStreamPacket();
+    virtual ~RtmpCreateStreamPacket();
+
+public:
+    virtual int decode(uint8_t *data, int len);
+    virtual int get_pkg_len();
+    virtual int get_cs_id();
+    virtual int get_msg_type();
+
+public:
+    virtual int encode_pkg(uint8_t *payload, int size);
+};
+
+class RtmpCreateStreamResponsePacket : public RtmpBasePacket
+{
+public:
+    std::string command_name;
+    double number;
+    RtmpAmf0Any *object;
+    double streamid_;
+
+public:
+    RtmpCreateStreamResponsePacket(double id, double streamid);
+    virtual ~RtmpCreateStreamResponsePacket();
+
+public:
+    virtual int decode(uint8_t *data, int len);
+    virtual int get_pkg_len();
+    virtual int get_cs_id();
+    virtual int get_msg_type();
+
+public:
+    virtual int encode_pkg(uint8_t *payload, int size);
+};
+
+class RtmpCloseStreamPacket : public RtmpBasePacket
+{
+public:
+    std::string command_name;
+    double number;
+    RtmpAmf0Any *object;
+
+public:
+    RtmpCloseStreamPacket();
+    virtual ~RtmpCloseStreamPacket();
+
+public:
+    virtual int decode(uint8_t *data, int len);
+    virtual int get_pkg_len();
+    virtual int get_cs_id();
+    virtual int get_msg_type();
+
+public:
+    virtual int encode_pkg(uint8_t *payload, int size);
+};
+
+class RtmpFMLEStartPacket : public RtmpBasePacket
+{
+public:
+    std::string command_name;
+    double number;
+    RtmpAmf0Any *object;
+    std::string stream_name;
+
+public:
+    RtmpFMLEStartPacket();
+    virtual ~RtmpFMLEStartPacket();
+
+public:
+    virtual int decode(uint8_t *data, int len);
+    virtual int get_pkg_len();
+    virtual int get_cs_id();
+    virtual int get_msg_type();
+
+public:
+    virtual int encode_pkg(uint8_t *payload, int size);
+
+public:
+    static RtmpFMLEStartPacket* create_release_stream(std::string stream);
+    static RtmpFMLEStartPacket* create_FC_publish(std::string stream);
+};
+
+class RtmpFMLEStartResponsePacket : public RtmpBasePacket
+{
+public:
+    std::string command_name;
+    double number;
+    RtmpAmf0Any *object;
+    RtmpAmf0Any *args;
+
+public:
+    RtmpFMLEStartResponsePacket(double id);
+    virtual ~RtmpFMLEStartResponsePacket();
+
+public:
+    virtual int decode(uint8_t *data, int len);
+    virtual int get_pkg_len();
+    virtual int get_cs_id();
+    virtual int get_msg_type();
+
+public:
+    virtual int encode_pkg(uint8_t *payload, int size);
+};
+
+class RtmpPublishPacket : public RtmpBasePacket
+{
+public:
+    std::string command_name;
+    double number;
+    RtmpAmf0Any *object;
+    std::string stream_name;
+    std::string type;
+
+public:
+    RtmpPublishPacket();
+    virtual ~RtmpPublishPacket();
+
+public:
+    virtual int decode(uint8_t *data, int len);
+    virtual int get_pkg_len();
+    virtual int get_cs_id();
+    virtual int get_msg_type();
+
+public:
+    virtual int encode_pkg(uint8_t *payload, int size);
+};
+
+class RtmpPausePacket : public RtmpBasePacket
+{
+public:
+    std::string command_name;
+    double number;
+    RtmpAmf0Any *object;
+    bool pause;
+    double time;
+
+public:
+    RtmpPausePacket();
+    virtual ~RtmpPausePacket();
+
+public:
+    virtual int decode(uint8_t *data, int len);
+    virtual int get_pkg_len();
+    virtual int get_cs_id();
+    virtual int get_msg_type();
+
+public:
+    virtual int encode_pkg(uint8_t *payload, int size);
+};
+
+class RtmpPlayPacket : public RtmpBasePacket
+{
+public:
+    std::string command_name;
+    double number;
+    RtmpAmf0Any *object;
+    std::string stream_name;
+    double start;
+    double duration;
+    bool reset;
+
+public:
+    RtmpPlayPacket();
+    virtual ~RtmpPlayPacket();
+
+public:
+    virtual int decode(uint8_t *data, int len);
+    virtual int get_pkg_len();
+    virtual int get_cs_id();
+    virtual int get_msg_type();
+
+public:
+    virtual int encode_pkg(uint8_t *payload, int size);
+};
+
+class RtmpPlayResponsePacket : public RtmpBasePacket
+{
+public:
+    std::string command_name;
+    double number;
+    RtmpAmf0Any *object;
+    RtmpAmf0Object *desc;
+
+public:
+    RtmpPlayResponsePacket();
+    virtual ~RtmpPlayResponsePacket();
+
+public:
+    virtual int decode(uint8_t *data, int len);
+    virtual int get_pkg_len();
+    virtual int get_cs_id();
+    virtual int get_msg_type();
+
+public:
+    virtual int encode_pkg(uint8_t *payload, int size);
+};
+
+class RtmpOnBWDonePacket : public RtmpBasePacket
+{
+public:
+    std::string command_name;
+    double number;
+    RtmpAmf0Any *args;
+
+public:
+    RtmpOnBWDonePacket();
+    virtual ~RtmpOnBWDonePacket();
+
+public:
+    virtual int decode(uint8_t *data, int len);
+    virtual int get_pkg_len();
+    virtual int get_cs_id();
+    virtual int get_msg_type();
+
+public:
+    virtual int encode_pkg(uint8_t *payload, int size);
+};
+
+class RtmpOnStatusCallPacket : public RtmpBasePacket
+{
+public:
+    std::string command_name;
+    double number;
+    RtmpAmf0Any *args;
+    RtmpAmf0Object *data;
+
+public:
+    RtmpOnStatusCallPacket();
+    virtual ~RtmpOnStatusCallPacket();
+
+public:
+    virtual int decode(uint8_t *data, int len);
+    virtual int get_pkg_len();
+    virtual int get_cs_id();
+    virtual int get_msg_type();
+
+public:
+    virtual int encode_pkg(uint8_t *payload, int size);
+};
+
+class RtmpOnStatusDataPacket : public RtmpBasePacket
+{
+public:
+    std::string command_name;
+    RtmpAmf0Object *data;
+
+public:
+    RtmpOnStatusDataPacket();
+    virtual ~RtmpOnStatusDataPacket();
+
+public:
+    virtual int decode(uint8_t *data, int len);
+    virtual int get_pkg_len();
+    virtual int get_cs_id();
+    virtual int get_msg_type();
+
+public:
+    virtual int encode_pkg(uint8_t *payload, int size);
+};
+
+class RtmpSampleAccessPacket : public RtmpBasePacket
+{
+public:
+    std::string command_name;
+    bool video_sample_access;
+    bool audio_sample_access;
+
+public:
+    RtmpSampleAccessPacket();
+    virtual ~RtmpSampleAccessPacket();
+
+public:
+    virtual int decode(uint8_t *data, int len);
+    virtual int get_pkg_len();
+    virtual int get_cs_id();
+    virtual int get_msg_type();
+
+public:
+    virtual int encode_pkg(uint8_t *payload, int size);
+};
+
+class RtmpOnMetaDataPacket : public RtmpBasePacket
+{
+public:
+    std::string command_name;
+    RtmpAmf0Object *metadata;
+
+public:
+    RtmpOnMetaDataPacket();
+    virtual ~RtmpOnMetaDataPacket();
 
 public:
     virtual int decode(uint8_t *data, int len);

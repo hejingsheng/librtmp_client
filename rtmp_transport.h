@@ -25,6 +25,17 @@ public:
     uint32_t rtmp_body_len;
 };
 
+struct RtmpAckWindowSize
+{
+    uint32_t window;
+    uint32_t recv_bytes;
+    uint32_t seq;
+
+    RtmpAckWindowSize() {
+        window = recv_bytes = seq = 0;
+    }
+};
+
 class RtmpMessageTransport
 {
 public:
@@ -38,14 +49,24 @@ public:
 private:
     int do_send_message(RtmpHeader *header, uint8_t *payload, int length);
     int do_recv_payload(RtmpChunkData *chunk, uint8_t *data, int length, bool &finish);
+    int on_recv_message(RtmpMessage *msg);
+    int decode_msg(RtmpMessage *msg, RtmpBasePacket **ppacket);
 
 private:
+    std::unordered_map<double, std::string> requestsMap_;
+
+private:
+    int32_t in_buffer_length;
     uint32_t in_chunk_size;
+    RtmpAckWindowSize in_ack_size;
     std::unordered_map<uint32_t, RtmpChunkData*> chunk_cache_;
 
 private:
     uint32_t out_chunk_size;
+    RtmpAckWindowSize out_ack_size;
     uint8_t *send_cache_buf;
+
+private:
     NetCore::BaseSocket *socket_;
 };
 

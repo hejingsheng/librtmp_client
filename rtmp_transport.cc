@@ -8,6 +8,7 @@
 #include "utils.h"
 
 const uint32_t RTMP_DEFAULT_CHUNKSIZE = 128;
+const uint32_t RTMP_MAX_CHUNKSIZE = 65535;
 const uint32_t RTMP_DEFAULT_CACHE_BUFFER_SIZE = (32*1024);
 const uint8_t RTMP_DEFAULT_CHUNK_SIZE = 16;
 
@@ -36,6 +37,7 @@ RtmpMessageTransport::RtmpMessageTransport(NetCore::BaseSocket *socket)
 {
     out_chunk_size = RTMP_DEFAULT_CHUNKSIZE;
     in_chunk_size = RTMP_DEFAULT_CHUNKSIZE;
+    in_buffer_length = 0;
     send_cache_buf = new uint8_t[RTMP_DEFAULT_CACHE_BUFFER_SIZE];
     chunk_cache_.clear();
     for (int i = 0; i < RTMP_DEFAULT_CHUNK_SIZE; i++)
@@ -184,6 +186,7 @@ int RtmpMessageTransport::recvRtmpMessage(const char *data, int length, RtmpMess
         RtmpMessage *rtmpmsg = new RtmpMessage();
         rtmpmsg->create_msg(&chunk->h, chunk->getPaylaod(), chunk->h.msg_length);
         *pmsg = rtmpmsg;
+        on_recv_message(rtmpmsg);
         chunk->reset();
     }
     return offset;
@@ -229,6 +232,7 @@ int RtmpMessageTransport::do_send_message(RtmpHeader *header, uint8_t *payload, 
     {
         // send data
         socket_->sendData((const char*)send_cache_buf, index);
+        index = 0;
     }
     return 0;
 }
@@ -256,6 +260,226 @@ int RtmpMessageTransport::do_recv_payload(RtmpChunkData *chunk, uint8_t *data, i
         ILOG("complete recv rtmp message\n");
         finish = true;
     }
+    return offset;
+}
+
+int RtmpMessageTransport::on_recv_message(RtmpMessage *msg)
+{
+    int ret = 0;
+    RtmpBasePacket *pkg = nullptr;
+
+    switch(msg->rtmp_header.msg_type_id)
+    {
+        case RTMP_MSG_SetChunkSize:
+        case RTMP_MSG_UserControlMessage:
+        case RTMP_MSG_WindowAcknowledgementSize:
+            ret = decode_msg(msg, &pkg);
+            if (ret < 0)
+            {
+                return ret;
+            }
+            break;
+        case RTMP_MSG_VideoMessage:
+        case RTMP_MSG_AudioMessage:
+            DLOG("recv audio/video msg\n");
+        default:
+            return 0;
+    }
+    if (pkg == nullptr)
+    {
+        ELOG("pkg decode error\n");
+        return -1;
+    }
+    AutoFree(RtmpBasePacket, pkg);
+    if (msg->rtmp_header.msg_type_id == RTMP_MSG_UserControlMessage)
+    {
+        RtmpUserControlPacket *packet = dynamic_cast<RtmpUserControlPacket*>(pkg);
+        if (packet != nullptr)
+        {
+            if (packet->event_type == RtmpPCUCSetBufferLength)
+            {
+                in_buffer_length = packet->event_data;
+            }
+            if (packet->event_type == RtmpPCUCPingRequest)
+            {
+                // send ping message
+            }
+        }
+    }
+    else if (msg->rtmp_header.msg_type_id == RTMP_MSG_WindowAcknowledgementSize)
+    {
+        RtmpSetWindowAckSizePacket *packet = dynamic_cast<RtmpSetWindowAckSizePacket*>(pkg);
+        if (packet != nullptr)
+        {
+            if (packet->window_ack_size > 0)
+            {
+                in_ack_size.window = (uint32_t)packet->window_ack_size;
+            }
+        }
+    }
+    else if (msg->rtmp_header.msg_type_id == RTMP_MSG_SetChunkSize)
+    {
+        RtmpSetChunkSizePacket *packet = dynamic_cast<RtmpSetChunkSizePacket*>(pkg);
+        if (packet != nullptr)
+        {
+            if (packet->chunk_size < RTMP_DEFAULT_CHUNKSIZE || packet->chunk_size > RTMP_MAX_CHUNKSIZE)
+            {
+                WLOG("chunk should in [%d, %d], this chunk size is %d\n", RTMP_DEFAULT_CHUNKSIZE, RTMP_MAX_CHUNKSIZE, packet->chunk_size);
+            }
+            if (packet->chunk_size < RTMP_DEFAULT_CHUNKSIZE)
+            {
+                ELOG("chunk size is invalid\n");
+                return -2;
+            }
+            ILOG("set chunk size %d\n", packet->chunk_size);
+            in_chunk_size = packet->chunk_size;
+        }
+    }
+    else
+    {
+        ILOG("other msg type %d\n", msg->rtmp_header.msg_type_id);
+        return 0;
+    }
+    return 0;
+}
+
+int RtmpMessageTransport::decode_msg(RtmpMessage *msg, RtmpBasePacket **ppacket)
+{
+    int ret = 0;
+    int offset = 0;
+    RtmpBasePacket *pkg = nullptr;
+    uint8_t *body = msg->rtmp_body;
+    uint32_t bodylen = msg->rtmp_body_len;
+
+    if (msg->rtmp_header.msg_type_id == RTMP_MSG_AMF0CommandMessage
+        || msg->rtmp_header.msg_type_id == RTMP_MSG_AMF3CommandMessage
+        || msg->rtmp_header.msg_type_id == RTMP_MSG_AMF0DataMessage
+        || msg->rtmp_header.msg_type_id == RTMP_MSG_AMF3DataMessage)
+    {
+        if (msg->rtmp_header.msg_type_id == RTMP_MSG_AMF3CommandMessage)
+        {
+            offset++;
+        }
+        std::string command = "";
+        ret = rtmp_amf0_read_string(body+offset, bodylen-offset, command);
+        if (ret < 0)
+        {
+            ELOG("deocde command error\n");
+            return ret;
+        }
+        offset += ret;
+        if (command == "_result" || command == "_error")
+        {
+            // rtmp result response or error response
+            double number = 0.0;
+            ret = rtmp_amf0_read_number(body+offset, bodylen-offset, number);
+            if (ret < 0)
+            {
+                ELOG("deocde number error for %s\n", command.c_str());
+                return ret;
+            }
+            if (requestsMap_.find(number) == requestsMap_.end())
+            {
+                ELOG("not find this request %s\n", command.c_str());
+                return -2;
+            }
+            std::string request_name = requestsMap_[number];
+            if (request_name == "connect")
+            {
+
+            }
+            else if (request_name == "createStream")
+            {
+
+            }
+            else if (request_name == "releaseStream")
+            {
+
+            }
+            else if (request_name == "FCPublish")
+            {
+
+            }
+            else if (request_name == "FCUnpublish")
+            {
+
+            }
+            else
+            {
+
+            }
+        }
+        // reset offset to 0 decode again
+        offset = 0;
+        if (msg->rtmp_header.msg_type_id == RTMP_MSG_AMF3CommandMessage)
+        {
+            offset++;
+        }
+        if (command == "connect") {
+            pkg = new RtmpConnectPacket();
+            ret = pkg->decode(body+offset, bodylen-offset);
+            if (ret < 0)
+            {
+                return ret;
+            }
+            offset += ret;
+        } else if (command == "createStream") {
+
+        } else if (command == "play") {
+
+        } else if (command == "pause") {
+
+        } else if (command == "releaseStream") {
+
+        } else if (command == "FCPublish") {
+
+        } else if (command == "publish") {
+
+        } else if (command == "FCUnpublish") {
+
+        } else if (command == "@setDataFrame") {
+
+        } else if (command == "onMetaData") {
+
+        } else if (command == "closeStream") {
+
+        }
+    }
+    else if (msg->rtmp_header.msg_type_id == RTMP_MSG_UserControlMessage)
+    {
+        pkg = new RtmpUserControlPacket();
+        ret = pkg->decode(body+offset, bodylen-offset);
+        offset += ret;
+    }
+    else if (msg->rtmp_header.msg_type_id == RTMP_MSG_WindowAcknowledgementSize)
+    {
+        pkg = new RtmpSetWindowAckSizePacket();
+        ret = pkg->decode(body+offset, bodylen-offset);
+        offset += ret;
+    }
+    else if (msg->rtmp_header.msg_type_id == RTMP_MSG_Acknowledgement)
+    {
+        pkg = new RtmpAcknowledgementPacket();
+        ret = pkg->decode(body+offset, bodylen-offset);
+        offset += ret;
+    }
+    else if (msg->rtmp_header.msg_type_id == RTMP_MSG_SetChunkSize)
+    {
+        pkg = new RtmpSetChunkSizePacket();
+        ret = pkg->decode(body+offset, bodylen-offset);
+        offset += ret;
+    }
+    else if (msg->rtmp_header.msg_type_id == RTMP_MSG_SetPeerBandwidth)
+    {
+        pkg = new RtmpSetPeerBandwidthPacket();
+        ret = pkg->decode(body+offset, bodylen-offset);
+        offset += ret;
+    }
+    else
+    {
+        WLOG("drop unknow msg type=%d\n", msg->rtmp_header.msg_type_id);
+    }
+    *ppacket = pkg;
     return offset;
 }
 

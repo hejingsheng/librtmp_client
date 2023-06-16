@@ -6,6 +6,7 @@
 #include "rtmpclient.h"
 #include "base/logger.h"
 #include "app_protocol/rtmp/rtmp_stack_packet.h"
+#include "autofree.h"
 
 RtmpPublishClient::RtmpPublishClient(std::string app, std::string live)
 {
@@ -110,6 +111,7 @@ void RtmpPublishClient::doHandshake(const char *data, int size)
 void RtmpPublishClient::connectApp()
 {
     RtmpConnectPacket *pkg = new RtmpConnectPacket();
+    AutoFree(RtmpConnectPacket, pkg);
     pkg->command_object->set("app", RtmpAmf0Any::str(rtmp_app_.c_str()));
     pkg->command_object->set("type", RtmpAmf0Any::str("nonprivate"));
     pkg->command_object->set("flashVer", RtmpAmf0Any::str("Jack He Rtmp Client(v0.0.1)"));
@@ -142,7 +144,62 @@ int RtmpPublishClient::processData(const char *data, int length)
         data_cache_->pop_data(ret);
         if (msg != nullptr) {
             ILOG("msg type=%d\n", msg->rtmp_header.msg_type_id);
-            //processRtmpMsg(msg);
+            processRtmpMsg(msg);
+        }
+    }
+    return ret;
+}
+
+int RtmpPublishClient::processRtmpMsg(RtmpMessage *msg)
+{
+    int ret = 0;
+    switch(msg->rtmp_header.msg_type_id)
+    {
+        case RTMP_MSG_SetChunkSize:
+        case RTMP_MSG_UserControlMessage:
+        case RTMP_MSG_WindowAcknowledgementSize:
+            ret = decode_msg(&msg->rtmp_header, msg->rtmp_body, msg->rtmp_body_len);
+            break;
+        case RTMP_MSG_VideoMessage:
+        case RTMP_MSG_AudioMessage:
+            DLOG("recv audio/video msg\n");
+        default:
+            return 0;
+    }
+    return 0;
+}
+
+int RtmpPublishClient::decode_msg(RtmpHeader *header, uint8_t *body, int bodylen)
+{
+    int ret = 0;
+    int offset = 0;
+
+    if (header->msg_type_id == RTMP_MSG_AMF0CommandMessage
+        || header->msg_type_id == RTMP_MSG_AMF3CommandMessage
+        || header->msg_type_id == RTMP_MSG_AMF0DataMessage
+        || header->msg_type_id == RTMP_MSG_AMF3DataMessage)
+    {
+        if (header->msg_type_id == RTMP_MSG_AMF3CommandMessage)
+        {
+            offset++;
+        }
+        std::string command = "";
+        ret = rtmp_amf0_read_string(body+offset, bodylen-offset, command);
+        if (ret < 0)
+        {
+            ELOG("deocde command error\n");
+            return ret;
+        }
+        offset += ret;
+        if (command == "_result" || command == "_error")
+        {
+            double number = 0.0;
+            ret = rtmp_amf0_read_number(body+offset, bodylen-offset, number);
+            if (ret < 0)
+            {
+                ELOG("deocde number error for %s\n", command.c_str());
+                return ret;
+            }
         }
     }
     return ret;
