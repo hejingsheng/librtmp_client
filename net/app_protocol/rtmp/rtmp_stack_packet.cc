@@ -527,6 +527,7 @@ int RtmpConnectResponsePacket::decode(uint8_t *data, int len)
     {
         return -1;
     }
+    offset += ret;
     if (offset < len)
     {
         RtmpAmf0Any *p = nullptr;
@@ -1824,9 +1825,15 @@ int RtmpPlayResponsePacket::encode_pkg(uint8_t *payload, int size) {
 }
 
 RtmpOnBWDonePacket::RtmpOnBWDonePacket() {
+    command_name = "onBWDone";
+    number = 0;
+    args = RtmpAmf0Any::null();
 }
 
 RtmpOnBWDonePacket::~RtmpOnBWDonePacket() {
+    if (args) {
+        delete args;
+    }
 }
 
 int RtmpOnBWDonePacket::decode(uint8_t * data, int len) {
@@ -1834,25 +1841,55 @@ int RtmpOnBWDonePacket::decode(uint8_t * data, int len) {
 }
 
 int RtmpOnBWDonePacket::get_pkg_len() {
-	return 0;
+	return RtmpAmf0Size::str(command_name) + RtmpAmf0Size::number() + RtmpAmf0Size::null();
 }
 
 int RtmpOnBWDonePacket::get_cs_id() {
-	return 0;
+	return RTMP_CID_OverConnection;
 }
 
 int RtmpOnBWDonePacket::get_msg_type() {
-	return 0;
+	return RTMP_MSG_AMF0CommandMessage;
 }
 
 int RtmpOnBWDonePacket::encode_pkg(uint8_t * payload, int size) {
-	return 0;
+	int ret;
+	int offset = 0;
+
+	ret = rtmp_amf0_write_string(payload+offset, size-offset, command_name);
+	if (ret < 0) {
+	    return ret;
+	}
+	offset += ret;
+
+	ret = rtmp_amf0_write_number(payload+offset, size-offset, number);
+	if (ret < 0) {
+	    return ret;
+	}
+	offset += ret;
+
+	ret = rtmp_amf0_write_null(payload+offset, size-offset);
+	if (ret < 0) {
+	    return ret;
+	}
+	offset += ret;
+	return offset;
 }
 
 RtmpOnStatusCallPacket::RtmpOnStatusCallPacket() {
+    command_name = "onStatus";
+    number = 0;
+    args = RtmpAmf0Any::null();
+    data = RtmpAmf0Any::object();
 }
 
 RtmpOnStatusCallPacket::~RtmpOnStatusCallPacket() {
+    if (args) {
+        delete args;
+    }
+    if (data) {
+        delete data;
+    }
 }
 
 int RtmpOnStatusCallPacket::decode(uint8_t * data, int len) {
@@ -1860,25 +1897,53 @@ int RtmpOnStatusCallPacket::decode(uint8_t * data, int len) {
 }
 
 int RtmpOnStatusCallPacket::get_pkg_len() {
-	return 0;
+	return RtmpAmf0Size::str(command_name) + RtmpAmf0Size::number() + RtmpAmf0Size::null() + RtmpAmf0Size::object(data);
 }
 
 int RtmpOnStatusCallPacket::get_cs_id() {
-	return 0;
+	return RTMP_CID_OverConnection;
 }
 
 int RtmpOnStatusCallPacket::get_msg_type() {
-	return 0;
+	return RTMP_MSG_AMF0CommandMessage;
 }
 
 int RtmpOnStatusCallPacket::encode_pkg(uint8_t * payload, int size) {
-	return 0;
+	int ret;
+	int offset = 0;
+
+	ret = rtmp_amf0_write_string(payload+offset, size-offset, command_name);
+	if (ret < 0) {
+	    return ret;
+	}
+	offset += ret;
+	ret = rtmp_amf0_write_number(payload+offset, size-offset, number);
+    if (ret < 0) {
+        return ret;
+    }
+    offset += ret;
+    ret = rtmp_amf0_write_null(payload+offset, size-offset);
+    if (ret < 0) {
+        return ret;
+    }
+    offset += ret;
+    ret = data->write(payload+offset, size-offset);
+    if (ret < 0) {
+        return ret;
+    }
+    offset += ret;
+    return offset;
 }
 
 RtmpOnStatusDataPacket::RtmpOnStatusDataPacket() {
+    command_name = "onStatus";
+    data = RtmpAmf0Any::object();
 }
 
 RtmpOnStatusDataPacket::~RtmpOnStatusDataPacket() {
+    if (data) {
+        delete data;
+    }
 }
 
 int RtmpOnStatusDataPacket::decode(uint8_t * data, int len) {
@@ -1886,22 +1951,38 @@ int RtmpOnStatusDataPacket::decode(uint8_t * data, int len) {
 }
 
 int RtmpOnStatusDataPacket::get_pkg_len() {
-	return 0;
+	return RtmpAmf0Size::str(command_name) + RtmpAmf0Size::object(data);
 }
 
 int RtmpOnStatusDataPacket::get_cs_id() {
-	return 0;
+	return RTMP_CID_OverStream;
 }
 
 int RtmpOnStatusDataPacket::get_msg_type() {
-	return 0;
+	return RTMP_MSG_AMF0DataMessage;
 }
 
 int RtmpOnStatusDataPacket::encode_pkg(uint8_t * payload, int size) {
-	return 0;
+    int ret;
+    int offset = 0;
+
+    ret = rtmp_amf0_write_string(payload+offset, size-offset, command_name);
+    if (ret < 0) {
+        return ret;
+    }
+    offset += ret;
+    ret = data->write(payload+offset, size-offset);
+    if (ret < 0) {
+        return ret;
+    }
+    offset += ret;
+    return offset;
 }
 
 RtmpSampleAccessPacket::RtmpSampleAccessPacket() {
+    command_name = "|RtmpSampleAccess";
+    video_sample_access = false;
+    audio_sample_access = false;
 }
 
 RtmpSampleAccessPacket::~RtmpSampleAccessPacket() {
@@ -1912,43 +1993,117 @@ int RtmpSampleAccessPacket::decode(uint8_t * data, int len) {
 }
 
 int RtmpSampleAccessPacket::get_pkg_len() {
-	return 0;
+	return RtmpAmf0Size::str(command_name) + RtmpAmf0Size::boolean() + RtmpAmf0Size::boolean();
 }
 
 int RtmpSampleAccessPacket::get_cs_id() {
-	return 0;
+	return RTMP_CID_OverStream;
 }
 
 int RtmpSampleAccessPacket::get_msg_type() {
-	return 0;
+	return RTMP_MSG_AMF0DataMessage;
 }
 
 int RtmpSampleAccessPacket::encode_pkg(uint8_t * payload, int size) {
-	return 0;
+    int ret;
+    int offset = 0;
+
+    ret = rtmp_amf0_write_string(payload+offset, size-offset, command_name);
+    if (ret < 0) {
+        return ret;
+    }
+    offset += ret;
+    ret = rtmp_amf0_write_boolean(payload+offset, size-offset, video_sample_access);
+    if (ret < 0) {
+        return ret;
+    }
+    offset += ret;
+    ret = rtmp_amf0_write_boolean(payload+offset, size-offset, audio_sample_access);
+    if (ret < 0) {
+        return ret;
+    }
+    offset += ret;
+    return offset;
 }
 
 RtmpOnMetaDataPacket::RtmpOnMetaDataPacket() {
+    command_name = "onMetaData";
+    metadata = RtmpAmf0Any::object();
 }
 
 RtmpOnMetaDataPacket::~RtmpOnMetaDataPacket() {
+    if (metadata) {
+        delete metadata;
+    }
 }
 
 int RtmpOnMetaDataPacket::decode(uint8_t * data, int len) {
-	return 0;
+    int ret;
+    int offset = 0;
+
+    ret = rtmp_amf0_read_string(data+offset, len-offset, command_name);
+    if (ret < 0) {
+        return ret;
+    }
+    offset += ret;
+    if (command_name == "@setDataFrame") {
+        ret = rtmp_amf0_read_string(data+offset, len-offset, command_name);
+        if (ret < 0) {
+            return ret;
+        }
+        offset += ret;
+    }
+    if (offset < len) {
+        RtmpAmf0Any *any = nullptr;
+        ret = rtmp_amf0_read_any(data+offset, len-offset, &any);
+        if (ret < 0) {
+            return ret;
+        }
+        offset += ret;
+        if (any->is_object()) {
+            if (metadata) {
+                delete metadata;
+            }
+            metadata = any->to_object();
+            return offset;
+        }
+        AutoFree(RtmpAmf0Any, any);
+        if (any->is_ecma_array()) {
+            RtmpAmf0EcmaArray *arr = any->to_ecma_array();
+
+            for (int i = 0; i < arr->count(); i++) {
+                metadata->set(arr->key_at(i), arr->value_at(i)->copy());
+            }
+        }
+    }
+	return offset;
 }
 
 int RtmpOnMetaDataPacket::get_pkg_len() {
-	return 0;
+	return RtmpAmf0Size::str(command_name) + RtmpAmf0Size::object(metadata);
 }
 
 int RtmpOnMetaDataPacket::get_cs_id() {
-	return 0;
+	return RTMP_CID_OverConnection2;
 }
 
 int RtmpOnMetaDataPacket::get_msg_type() {
-	return 0;
+	return RTMP_MSG_AMF0DataMessage;
 }
 
 int RtmpOnMetaDataPacket::encode_pkg(uint8_t * payload, int size) {
-	return 0;
+	int ret;
+	int offset = 0;
+
+	ret = rtmp_amf0_write_string(payload+offset, size-offset, command_name);
+    if (ret < 0) {
+        return ret;
+    }
+    offset += ret;
+    ret = metadata->write(payload+offset, size-offset);
+    if (ret < 0) {
+        return ret;
+    }
+    offset += ret;
+    return offset;
 }

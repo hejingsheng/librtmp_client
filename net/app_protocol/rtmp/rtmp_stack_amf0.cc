@@ -1351,18 +1351,19 @@ RtmpAmf0Any* RtmpAmf0Undefined::copy()
 
 int rtmp_amf0_read_any(uint8_t *data, int len, RtmpAmf0Any** ppvalue)
 {
-    int err = 0;
+    int ret;
+    int offset = 0;
 
-    if ((err = RtmpAmf0Any::discovery(data, len, ppvalue)) != 0) {
+    if ((ret = RtmpAmf0Any::discovery(data+offset, len-offset, ppvalue)) != 0) {
         return -1;
     }
 
-    if ((err = (*ppvalue)->read(data, len)) != 0) {
+    if ((ret = (*ppvalue)->read(data+offset, len-offset)) < 0) {
         delete (*ppvalue);
         return -1;
     }
-
-    return err;
+    offset += ret;
+    return offset;
 }
 
 int rtmp_amf0_read_string(uint8_t *data, int len, string& value)
@@ -1382,7 +1383,7 @@ int rtmp_amf0_read_string(uint8_t *data, int len, string& value)
         //return srs_error_new(ERROR_RTMP_AMF0_DECODE, "String invalid marker=%#x", marker);
         return -1;
     }
-    ret = rtmp_amf0_read_utf8(data+offset, len-1, value);
+    ret = rtmp_amf0_read_utf8(data+offset, len-offset, value);
     if (ret < 0)
     {
         return ret;
@@ -1402,7 +1403,7 @@ int rtmp_amf0_write_string(uint8_t *data, int len, string value)
     }
     data[offset] = RTMP_AMF0_String;
     offset++;
-    ret = rtmp_amf0_write_utf8(data+offset, len-1, value);
+    ret = rtmp_amf0_write_utf8(data+offset, len-offset, value);
     if (ret < 0)
     {
         return ret;

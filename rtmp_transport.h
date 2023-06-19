@@ -44,12 +44,13 @@ public:
 
 public:
     int sendRtmpMessage(RtmpBasePacket *pkg, int streamid);
-    int recvRtmpMessage(const char *data, int length, RtmpMessage **pmsg);
+    int recvRtmpMessage(const char *data, int length, RtmpBasePacket **pmsg);
 
 private:
     int do_send_message(RtmpHeader *header, uint8_t *payload, int length);
     int do_recv_payload(RtmpChunkData *chunk, uint8_t *data, int length, bool &finish);
     int on_recv_message(RtmpMessage *msg);
+    int on_send_message(RtmpBasePacket *pkg);
     int decode_msg(RtmpMessage *msg, RtmpBasePacket **ppacket);
 
 private:

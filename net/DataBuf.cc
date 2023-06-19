@@ -1,4 +1,5 @@
 #include "DataBuf.h"
+#include "logger.h"
 #include <string.h>
 
 DataRingBuf::DataRingBuf(int size)
@@ -228,6 +229,7 @@ void DataCacheBuf::push_data(char *data, int size)
     if (length + size > MAX_CACHE_LEN)
     {
         //need realloc memory
+        ILOG("need realloc buffer\n");
         return;
     }
     memcpy(bytes+length, data, size);

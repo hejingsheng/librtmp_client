@@ -67,6 +67,7 @@ int RtmpPublishClient::onRecvData(const char *data, int size, const struct socka
     }
     else
     {
+        ILOG("recv %d data\n", size);
         processData(data, size);
     }
     return 0;
@@ -111,17 +112,23 @@ void RtmpPublishClient::doHandshake(const char *data, int size)
 void RtmpPublishClient::connectApp()
 {
     RtmpConnectPacket *pkg = new RtmpConnectPacket();
-    AutoFree(RtmpConnectPacket, pkg);
     pkg->command_object->set("app", RtmpAmf0Any::str(rtmp_app_.c_str()));
     pkg->command_object->set("type", RtmpAmf0Any::str("nonprivate"));
     pkg->command_object->set("flashVer", RtmpAmf0Any::str("Jack He Rtmp Client(v0.0.1)"));
     pkg->command_object->set("tcUrl", RtmpAmf0Any::str("rtmp://8.135.38.10:1935/live"));
     sendRtmpPacket(pkg, 0);
+
+    {
+        RtmpSetWindowAckSizePacket *pkg = new RtmpSetWindowAckSizePacket();
+        pkg->window_ack_size = 2500000;
+        sendRtmpPacket(pkg, 0);
+    }
 }
 
 void RtmpPublishClient::sendRtmpPacket(RtmpBasePacket *pkg, int streamid)
 {
     rtmp_transport_->sendRtmpMessage(pkg, streamid);
+    delete pkg;
 }
 
 void RtmpPublishClient::sendData(const char *data, int len)
@@ -131,74 +138,22 @@ void RtmpPublishClient::sendData(const char *data, int len)
 
 int RtmpPublishClient::processData(const char *data, int length)
 {
-    RtmpMessage *msg = nullptr;
+    RtmpBasePacket *packet = nullptr;
     int ret = 0;
     data_cache_->push_data((char*)data, length);
     while (data_cache_->len() > 0)
     {
-        ret = rtmp_transport_->recvRtmpMessage(data_cache_->data(), data_cache_->len(), &msg);
+        packet = nullptr;
+        ret = rtmp_transport_->recvRtmpMessage(data_cache_->data(), data_cache_->len(), &packet);
         if (ret < 0)
         {
             return ret;
         }
         data_cache_->pop_data(ret);
-        if (msg != nullptr) {
-            ILOG("msg type=%d\n", msg->rtmp_header.msg_type_id);
-            processRtmpMsg(msg);
-        }
-    }
-    return ret;
-}
-
-int RtmpPublishClient::processRtmpMsg(RtmpMessage *msg)
-{
-    int ret = 0;
-    switch(msg->rtmp_header.msg_type_id)
-    {
-        case RTMP_MSG_SetChunkSize:
-        case RTMP_MSG_UserControlMessage:
-        case RTMP_MSG_WindowAcknowledgementSize:
-            ret = decode_msg(&msg->rtmp_header, msg->rtmp_body, msg->rtmp_body_len);
-            break;
-        case RTMP_MSG_VideoMessage:
-        case RTMP_MSG_AudioMessage:
-            DLOG("recv audio/video msg\n");
-        default:
-            return 0;
-    }
-    return 0;
-}
-
-int RtmpPublishClient::decode_msg(RtmpHeader *header, uint8_t *body, int bodylen)
-{
-    int ret = 0;
-    int offset = 0;
-
-    if (header->msg_type_id == RTMP_MSG_AMF0CommandMessage
-        || header->msg_type_id == RTMP_MSG_AMF3CommandMessage
-        || header->msg_type_id == RTMP_MSG_AMF0DataMessage
-        || header->msg_type_id == RTMP_MSG_AMF3DataMessage)
-    {
-        if (header->msg_type_id == RTMP_MSG_AMF3CommandMessage)
-        {
-            offset++;
-        }
-        std::string command = "";
-        ret = rtmp_amf0_read_string(body+offset, bodylen-offset, command);
-        if (ret < 0)
-        {
-            ELOG("deocde command error\n");
-            return ret;
-        }
-        offset += ret;
-        if (command == "_result" || command == "_error")
-        {
-            double number = 0.0;
-            ret = rtmp_amf0_read_number(body+offset, bodylen-offset, number);
-            if (ret < 0)
-            {
-                ELOG("deocde number error for %s\n", command.c_str());
-                return ret;
+        if (packet != nullptr) {
+            RtmpConnectResponsePacket *pkg = dynamic_cast<RtmpConnectResponsePacket*>(packet);
+            if (pkg != nullptr) {
+                ILOG("recv connect response\n");
             }
         }
     }

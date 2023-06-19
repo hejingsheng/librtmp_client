@@ -79,11 +79,12 @@ int RtmpMessageTransport::sendRtmpMessage(RtmpBasePacket *pkg, int streamid)
         return -1;
     }
     do_send_message(&header, payload, size);
+    on_send_message(pkg);
     delete[] payload;
     return 0;
 }
 
-int RtmpMessageTransport::recvRtmpMessage(const char *data, int length, RtmpMessage **pmsg)
+int RtmpMessageTransport::recvRtmpMessage(const char *data, int length, RtmpBasePacket **ppkg)
 {
     int offset = 0;
     int ret;
@@ -184,9 +185,10 @@ int RtmpMessageTransport::recvRtmpMessage(const char *data, int length, RtmpMess
     {
         // rtmp message recv complete
         RtmpMessage *rtmpmsg = new RtmpMessage();
+        AutoFree(RtmpMessage, rtmpmsg);
         rtmpmsg->create_msg(&chunk->h, chunk->getPaylaod(), chunk->h.msg_length);
-        *pmsg = rtmpmsg;
         on_recv_message(rtmpmsg);
+        decode_msg(rtmpmsg, ppkg);
         chunk->reset();
     }
     return offset;
@@ -283,6 +285,7 @@ int RtmpMessageTransport::on_recv_message(RtmpMessage *msg)
         case RTMP_MSG_AudioMessage:
             DLOG("recv audio/video msg\n");
         default:
+            DLOG("recv other(%d) msg\n", msg->rtmp_header.msg_type_id);
             return 0;
     }
     if (pkg == nullptr)
@@ -314,6 +317,7 @@ int RtmpMessageTransport::on_recv_message(RtmpMessage *msg)
             if (packet->window_ack_size > 0)
             {
                 in_ack_size.window = (uint32_t)packet->window_ack_size;
+                ILOG("set window in ack size %d\n", packet->window_ack_size);
             }
         }
     }
@@ -343,6 +347,52 @@ int RtmpMessageTransport::on_recv_message(RtmpMessage *msg)
     return 0;
 }
 
+int RtmpMessageTransport::on_send_message(RtmpBasePacket *pkg)
+{
+    switch(pkg->get_msg_type())
+    {
+        case RTMP_MSG_SetChunkSize: {
+            RtmpSetChunkSizePacket *packet = dynamic_cast<RtmpSetChunkSizePacket *>(pkg);
+            if (packet) {
+                out_chunk_size = packet->chunk_size;
+            }
+        }
+            break;
+        case RTMP_MSG_WindowAcknowledgementSize: {
+            RtmpSetWindowAckSizePacket *packet = dynamic_cast<RtmpSetWindowAckSizePacket *>(pkg);
+            if (packet) {
+                out_ack_size.window = packet->window_ack_size;
+            }
+        }
+            break;
+        case RTMP_MSG_AMF0CommandMessage:
+        case RTMP_MSG_AMF3CommandMessage: {
+            if (true) {
+                RtmpConnectPacket *packet = dynamic_cast<RtmpConnectPacket *>(pkg);
+                if (packet) {
+                    requestsMap_[packet->number] = packet->command_name;
+                }
+            }
+            if (true) {
+                RtmpCreateStreamPacket *packet = dynamic_cast<RtmpCreateStreamPacket *>(pkg);
+                if (packet) {
+                    requestsMap_[packet->number] = packet->command_name;
+                }
+            }
+            if (true) {
+                RtmpFMLEStartPacket *packet = dynamic_cast<RtmpFMLEStartPacket *>(pkg);
+                if (packet) {
+                    requestsMap_[packet->number] = packet->command_name;
+                }
+            }
+        }
+            break;
+        default:
+            return 0;
+    }
+    return 0;
+}
+
 int RtmpMessageTransport::decode_msg(RtmpMessage *msg, RtmpBasePacket **ppacket)
 {
     int ret = 0;
@@ -354,130 +404,201 @@ int RtmpMessageTransport::decode_msg(RtmpMessage *msg, RtmpBasePacket **ppacket)
     if (msg->rtmp_header.msg_type_id == RTMP_MSG_AMF0CommandMessage
         || msg->rtmp_header.msg_type_id == RTMP_MSG_AMF3CommandMessage
         || msg->rtmp_header.msg_type_id == RTMP_MSG_AMF0DataMessage
-        || msg->rtmp_header.msg_type_id == RTMP_MSG_AMF3DataMessage)
-    {
-        if (msg->rtmp_header.msg_type_id == RTMP_MSG_AMF3CommandMessage)
-        {
+        || msg->rtmp_header.msg_type_id == RTMP_MSG_AMF3DataMessage) {
+        if (msg->rtmp_header.msg_type_id == RTMP_MSG_AMF3CommandMessage) {
             offset++;
         }
         std::string command = "";
         ret = rtmp_amf0_read_string(body+offset, bodylen-offset, command);
-        if (ret < 0)
-        {
+        if (ret < 0) {
             ELOG("deocde command error\n");
             return ret;
         }
         offset += ret;
-        if (command == "_result" || command == "_error")
-        {
+        if (command == "_result" || command == "_error") {
             // rtmp result response or error response
             double number = 0.0;
             ret = rtmp_amf0_read_number(body+offset, bodylen-offset, number);
-            if (ret < 0)
-            {
+            if (ret < 0) {
                 ELOG("deocde number error for %s\n", command.c_str());
                 return ret;
             }
-            if (requestsMap_.find(number) == requestsMap_.end())
-            {
+            // reset offset to 0 decode again
+            offset = 0;
+            if (msg->rtmp_header.msg_type_id == RTMP_MSG_AMF3CommandMessage) {
+                offset++;
+            }
+            if (requestsMap_.find(number) == requestsMap_.end()) {
                 ELOG("not find this request %s\n", command.c_str());
                 return -2;
             }
             std::string request_name = requestsMap_[number];
-            if (request_name == "connect")
-            {
-
+            if (request_name == "connect") {
+                pkg = new RtmpConnectResponsePacket();
+                ret = pkg->decode(body+offset, bodylen-offset);
+                if (ret < 0) {
+                    ELOG("decode connect res error\n");
+                    return ret;
+                }
+                offset += ret;
+            } else if (request_name == "createStream") {
+                pkg = new RtmpCreateStreamResponsePacket(0, 0);
+                ret = pkg->decode(body+offset, bodylen-offset);
+                if (ret < 0) {
+                    ELOG("decode create stream res error\n");
+                    return ret;
+                }
+                offset += ret;
+            } else if (request_name == "releaseStream") {
+                pkg = new RtmpFMLEStartResponsePacket(0);
+                ret = pkg->decode(body+offset, bodylen-offset);
+                if (ret < 0) {
+                    ELOG("decode release stream res error\n");
+                    return ret;
+                }
+                offset += ret;
+            } else if (request_name == "FCPublish") {
+                pkg = new RtmpFMLEStartResponsePacket(0);
+                ret = pkg->decode(body+offset, bodylen-offset);
+                if (ret < 0) {
+                    ELOG("decode fcpublish res error\n");
+                    return ret;
+                }
+                offset += ret;
+            } else if (request_name == "FCUnpublish") {
+                pkg = new RtmpFMLEStartResponsePacket(0);
+                ret = pkg->decode(body+offset, bodylen-offset);
+                if (ret < 0) {
+                    ELOG("decode fcunpublish res error\n");
+                    return ret;
+                }
+                offset += ret;
+            } else {
+                ELOG("unkonw request name\n");
+                return -2;
             }
-            else if (request_name == "createStream")
-            {
-
-            }
-            else if (request_name == "releaseStream")
-            {
-
-            }
-            else if (request_name == "FCPublish")
-            {
-
-            }
-            else if (request_name == "FCUnpublish")
-            {
-
-            }
-            else
-            {
-
-            }
+            *ppacket = pkg;
+            return offset;
         }
         // reset offset to 0 decode again
         offset = 0;
-        if (msg->rtmp_header.msg_type_id == RTMP_MSG_AMF3CommandMessage)
-        {
+        if (msg->rtmp_header.msg_type_id == RTMP_MSG_AMF3CommandMessage) {
             offset++;
         }
         if (command == "connect") {
             pkg = new RtmpConnectPacket();
             ret = pkg->decode(body+offset, bodylen-offset);
-            if (ret < 0)
-            {
+            if (ret < 0) {
                 return ret;
             }
             offset += ret;
         } else if (command == "createStream") {
-
+            pkg = new RtmpCloseStreamPacket();
+            ret = pkg->decode(body+offset, bodylen-offset);
+            if (ret < 0) {
+                return ret;
+            }
+            offset += ret;
         } else if (command == "play") {
-
+            pkg = new RtmpPlayPacket();
+            ret = pkg->decode(body+offset, bodylen-offset);
+            if (ret < 0) {
+                return ret;
+            }
+            offset += ret;
         } else if (command == "pause") {
-
+            pkg = new RtmpPausePacket();
+            ret = pkg->decode(body+offset, bodylen-offset);
+            if (ret < 0) {
+                return ret;
+            }
+            offset += ret;
         } else if (command == "releaseStream") {
-
+            pkg = new RtmpFMLEStartPacket();
+            ret = pkg->decode(body+offset, bodylen-offset);
+            if (ret < 0) {
+                return ret;
+            }
+            offset += ret;
         } else if (command == "FCPublish") {
-
+            pkg = new RtmpFMLEStartPacket();
+            ret = pkg->decode(body+offset, bodylen-offset);
+            if (ret < 0) {
+                return ret;
+            }
+            offset += ret;
         } else if (command == "publish") {
-
+            pkg = new RtmpPublishPacket();
+            ret = pkg->decode(body+offset, bodylen-offset);
+            if (ret < 0) {
+                return ret;
+            }
+            offset += ret;
         } else if (command == "FCUnpublish") {
-
+            pkg = new RtmpFMLEStartPacket();
+            ret = pkg->decode(body+offset, bodylen-offset);
+            if (ret < 0) {
+                return ret;
+            }
+            offset += ret;
         } else if (command == "@setDataFrame") {
-
+            pkg = new RtmpOnMetaDataPacket();
+            ret = pkg->decode(body+offset, bodylen-offset);
+            if (ret < 0) {
+                return ret;
+            }
+            offset += ret;
         } else if (command == "onMetaData") {
-
+            pkg = new RtmpOnMetaDataPacket();
+            ret = pkg->decode(body+offset, bodylen-offset);
+            if (ret < 0) {
+                return ret;
+            }
+            offset += ret;
         } else if (command == "closeStream") {
-
+            pkg = new RtmpCloseStreamPacket();
+            ret = pkg->decode(body+offset, bodylen-offset);
+            if (ret < 0) {
+                return ret;
+            }
+            offset += ret;
+        } else if (msg->rtmp_header.msg_type_id == RTMP_MSG_AMF0CommandMessage
+                    || msg->rtmp_header.msg_type_id == RTMP_MSG_AMF3CommandMessage) {
+            pkg = new RtmpCallPacket();
+            ret = pkg->decode(body+offset, bodylen-offset);
+            if (ret < 0) {
+                return ret;
+            }
+            offset += ret;
+        } else {
+            ELOG("error command name %s\n", command.c_str());
+            return -2;
         }
-    }
-    else if (msg->rtmp_header.msg_type_id == RTMP_MSG_UserControlMessage)
-    {
+        *ppacket = pkg;
+        return offset;
+    } else if (msg->rtmp_header.msg_type_id == RTMP_MSG_UserControlMessage) {
         pkg = new RtmpUserControlPacket();
         ret = pkg->decode(body+offset, bodylen-offset);
         offset += ret;
-    }
-    else if (msg->rtmp_header.msg_type_id == RTMP_MSG_WindowAcknowledgementSize)
-    {
+    } else if (msg->rtmp_header.msg_type_id == RTMP_MSG_WindowAcknowledgementSize) {
         pkg = new RtmpSetWindowAckSizePacket();
         ret = pkg->decode(body+offset, bodylen-offset);
         offset += ret;
-    }
-    else if (msg->rtmp_header.msg_type_id == RTMP_MSG_Acknowledgement)
-    {
+    } else if (msg->rtmp_header.msg_type_id == RTMP_MSG_Acknowledgement) {
         pkg = new RtmpAcknowledgementPacket();
         ret = pkg->decode(body+offset, bodylen-offset);
         offset += ret;
-    }
-    else if (msg->rtmp_header.msg_type_id == RTMP_MSG_SetChunkSize)
-    {
+    } else if (msg->rtmp_header.msg_type_id == RTMP_MSG_SetChunkSize) {
         pkg = new RtmpSetChunkSizePacket();
         ret = pkg->decode(body+offset, bodylen-offset);
         offset += ret;
-    }
-    else if (msg->rtmp_header.msg_type_id == RTMP_MSG_SetPeerBandwidth)
-    {
+    } else if (msg->rtmp_header.msg_type_id == RTMP_MSG_SetPeerBandwidth) {
         pkg = new RtmpSetPeerBandwidthPacket();
         ret = pkg->decode(body+offset, bodylen-offset);
         offset += ret;
-    }
-    else
-    {
+    } else {
         WLOG("drop unknow msg type=%d\n", msg->rtmp_header.msg_type_id);
+        return -2;
     }
     *ppacket = pkg;
     return offset;
