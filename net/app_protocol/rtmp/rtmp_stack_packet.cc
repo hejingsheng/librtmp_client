@@ -1535,11 +1535,16 @@ int RtmpPublishPacket::encode_pkg(uint8_t *payload, int size) {
 		return ret;
 	}
 	offset += ret;
-	ret = rtmp_amf0_write_undefined(payload + offset, size - offset);
+	ret = rtmp_amf0_write_string(payload + offset, size - offset, stream_name);
 	if (ret < 0) {
 		return ret;
 	}
 	offset += ret;
+	ret = rtmp_amf0_write_string(payload+offset,size-offset, type);
+    if (ret < 0) {
+        return ret;
+    }
+    offset += ret;
     return offset;
 }
 

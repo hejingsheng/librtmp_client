@@ -31,7 +31,7 @@ enum RtmpServerHandshakeStatus {
 class RtmpPublishClient : public NetCore::ISocketCallback {
 
 public:
-    RtmpPublishClient(std::string app, std::string live);
+    RtmpPublishClient(std::string app, std::string stream);
     ~RtmpPublishClient();
 
 public:
@@ -47,6 +47,8 @@ protected:
 private:
     void doHandshake(const char *data, int size);
     void connectApp();
+    void createStream(std::string stream);
+    void publish(std::string stream, int streamid);
 
 private:
     void sendRtmpPacket(RtmpBasePacket *pkg, int streamid);
@@ -55,7 +57,7 @@ private:
 
 private:
     std::string rtmp_app_;
-    std::string rtmp_live_;
+    std::string rtmp_stream_;
 
 private:
     rtmp_handshake handshake;

@@ -8,10 +8,10 @@
 #include "app_protocol/rtmp/rtmp_stack_packet.h"
 #include "autofree.h"
 
-RtmpPublishClient::RtmpPublishClient(std::string app, std::string live)
+RtmpPublishClient::RtmpPublishClient(std::string app, std::string stream)
 {
     rtmp_app_ = app;
-    rtmp_live_ = live;
+    rtmp_stream_ = stream;
     status_ = RTMP_HANDSHAKE_CLIENT_START;
     data_cache_ = new DataCacheBuf();
     rtmp_transport_ = nullptr;
@@ -125,6 +125,40 @@ void RtmpPublishClient::connectApp()
     }
 }
 
+void RtmpPublishClient::createStream(std::string stream)
+{
+    if (true) {
+        RtmpFMLEStartPacket *pkg = RtmpFMLEStartPacket::create_release_stream(stream);
+        sendRtmpPacket(pkg, 0);
+    }
+
+    if (true) {
+        RtmpFMLEStartPacket *pkg = RtmpFMLEStartPacket::create_FC_publish(stream);
+        sendRtmpPacket(pkg, 0);
+    }
+
+    if (true) {
+        RtmpCreateStreamPacket *pkg = new RtmpCreateStreamPacket();
+        pkg->number = 4;
+        sendRtmpPacket(pkg, 0);
+    }
+}
+
+void RtmpPublishClient::publish(std::string stream, int streamid)
+{
+    if (true) {
+        RtmpSetChunkSizePacket *pkg = new RtmpSetChunkSizePacket();
+        pkg->chunk_size = 60000;
+        sendRtmpPacket(pkg, 0);
+    }
+
+    if (true) {
+        RtmpPublishPacket *pkg = new RtmpPublishPacket();
+        pkg->stream_name = stream;
+        sendRtmpPacket(pkg, streamid);
+    }
+}
+
 void RtmpPublishClient::sendRtmpPacket(RtmpBasePacket *pkg, int streamid)
 {
     rtmp_transport_->sendRtmpMessage(pkg, streamid);
@@ -151,9 +185,16 @@ int RtmpPublishClient::processData(const char *data, int length)
         }
         data_cache_->pop_data(ret);
         if (packet != nullptr) {
+            AutoFree(RtmpBasePacket, packet);
             RtmpConnectResponsePacket *pkg = dynamic_cast<RtmpConnectResponsePacket*>(packet);
             if (pkg != nullptr) {
                 ILOG("recv connect response\n");
+                createStream(rtmp_stream_);
+            }
+            RtmpCreateStreamResponsePacket *pkg1 = dynamic_cast<RtmpCreateStreamResponsePacket*>(packet);
+            if (pkg1 != nullptr) {
+                ILOG("recv create stream response stream id=%d\n", (int)pkg1->streamid_);
+                publish(rtmp_stream_, (int)pkg1->streamid_);
             }
         }
     }
