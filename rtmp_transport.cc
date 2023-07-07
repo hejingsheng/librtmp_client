@@ -73,6 +73,7 @@ int RtmpMessageTransport::sendRtmpMessage(RtmpBasePacket *pkg, int streamid)
     header.msg_type_id = pkg->get_msg_type();
     header.msg_stream_id = streamid;
     header.msg_length = pkg->get_pkg_len();
+    header.timestamp = pkg->getTimestamp();
     ret = pkg->encode(payload, size);
     if (ret < 0)
     {

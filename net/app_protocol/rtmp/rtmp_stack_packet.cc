@@ -406,6 +406,109 @@ void RtmpChunkData::copy_payload(uint8_t *data, int len)
     current_payload_len += len;
 }
 
+RtmpAVCPacket::RtmpAVCPacket() {
+
+}
+
+RtmpAVCPacket::~RtmpAVCPacket() {
+
+}
+
+int RtmpAVCPacket::encode_pkg(uint8_t *payload, int size) {
+    int offset = 0;
+    payload[offset++] = 0x17;
+    payload[offset++] = 0x00;
+    payload[offset++] = 0x00;
+    payload[offset++] = 0x00;
+    payload[offset++] = 0x00;
+
+    // avc struct sps
+    payload[offset++] = 0x01;
+    payload[offset++] = sps[1];
+    payload[offset++] = sps[2];
+    payload[offset++] = sps[3];
+    payload[offset++] = 0xfc | 3;
+    payload[offset++] = 0xe0 | 1;
+    offset += write_int16(payload+offset, spslen);
+    memcpy(payload+offset, sps, spslen);
+    offset += spslen;
+    // avc struct pps
+    payload[offset++] = 0x01;
+    offset += write_int16(payload+offset, ppslen);
+    memcpy(payload+offset, pps, ppslen);
+    offset += ppslen;
+    return 0;
+}
+
+int RtmpAVCPacket::decode(uint8_t *data, int len) {
+    return 0;
+}
+
+int RtmpAVCPacket::get_pkg_len() {
+    return 1+1+3+6+2+spslen+1+2+ppslen;
+}
+
+int RtmpAVCPacket::get_cs_id() {
+    return RTMP_CID_Video;
+}
+
+int RtmpAVCPacket::get_msg_type() {
+    return RTMP_MSG_VideoMessage;
+}
+
+RtmpVideoPacket::RtmpVideoPacket() {
+
+}
+
+RtmpVideoPacket::~RtmpVideoPacket() noexcept {
+
+}
+
+uint32_t RtmpVideoPacket::getTimestamp() {
+    return timestamp;
+}
+
+int RtmpVideoPacket::encode_pkg(uint8_t *payload, int size)
+{
+    int offset = 0;
+    uint8_t *q;
+    if (keyframe) {
+        payload[offset++] = 0x17;
+    }
+    else {
+        payload[offset++] = 0x27;
+    }
+    payload[offset++] = 0x01;
+    q = (uint8_t*)&timestamp;
+    payload[offset++] = q[2];
+    payload[offset++] = q[1];
+    payload[offset++] = q[0];
+    offset+= write_uint32(payload+offset, nalulen);
+    memcpy(payload+offset, nalu, nalulen);
+    offset += nalulen;
+    return 0;
+}
+
+int RtmpVideoPacket::decode(uint8_t *data, int len)
+{
+    return 0;
+}
+
+int RtmpVideoPacket::get_pkg_len()
+{
+    return 1 + 1 + 3 + 4 + nalulen;
+}
+
+int RtmpVideoPacket::get_cs_id()
+{
+    return RTMP_CID_Video;
+}
+
+int RtmpVideoPacket::get_msg_type()
+{
+    return RTMP_MSG_VideoMessage;
+}
+
 RtmpConnectPacket::RtmpConnectPacket()
 {
     command_name = "connect";
@@ -2112,3 +2215,4 @@ int RtmpOnMetaDataPacket::encode_pkg(uint8_t * payload, int size) {
     offset += ret;
     return offset;
 }
+

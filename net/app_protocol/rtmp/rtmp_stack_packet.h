@@ -130,6 +130,12 @@
 // generally use 0x07.
 #define RTMP_CID_Audio                          0x07
 
+#define RTMP_AUDIO_CODEC_G711A    0x0080
+#define RTMP_AUDIO_CODEC_G711U    0x0100
+#define RTMP_AUDIO_CODEC_AAC      0x0400
+
+#define RTMP_VIDEO_CODEC_H264     0x0080
+
 class RtmpHeader
 {
 public:
@@ -197,6 +203,7 @@ public:
 
 public:
     virtual int encode(uint8_t *&payload, int &size) ;
+    virtual uint32_t getTimestamp() {return 0;}
 
 public:
     virtual int encode_pkg(uint8_t *payload, int size) = 0;
@@ -206,6 +213,58 @@ public:
 public:
     virtual int get_cs_id() = 0;
     virtual int get_msg_type() = 0;
+};
+
+//class RtmpAudioPacket : public RtmpBasePacket
+//{
+//
+//};
+
+class RtmpAVCPacket : public RtmpBasePacket
+{
+public:
+    uint8_t *sps;
+    int spslen;
+    uint8_t *pps;
+    int ppslen;
+
+public:
+    RtmpAVCPacket();
+    virtual ~RtmpAVCPacket();
+
+public:
+    virtual int encode_pkg(uint8_t *payload, int size);
+    virtual int decode(uint8_t *data, int len);
+    virtual int get_pkg_len();
+
+public:
+    virtual int get_cs_id();
+    virtual int get_msg_type();
+};
+
+class RtmpVideoPacket : public RtmpBasePacket
+{
+public:
+    uint32_t timestamp;
+    uint8_t *nalu;
+    int nalulen;
+    bool keyframe;
+
+public:
+    RtmpVideoPacket();
+    virtual ~RtmpVideoPacket();
+
+public:
+    virtual uint32_t getTimestamp();
+
+public:
+    virtual int encode_pkg(uint8_t *payload, int size);
+    virtual int decode(uint8_t *data, int len);
+    virtual int get_pkg_len();
+
+public:
+    virtual int get_cs_id();
+    virtual int get_msg_type();
 };
 
 class RtmpConnectPacket : public RtmpBasePacket

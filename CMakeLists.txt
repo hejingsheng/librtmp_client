@@ -81,6 +81,6 @@ add_executable(rtmp_client
         net/app_protocol/rtmp/rtmp_stack_amf0.h
         net/app_protocol/rtmp/rtmp_stack_amf0.cc
         net/app_protocol/rtmp/rtmp_stack_packet.cc
-        net/app_protocol/rtmp/rtmp_stack_packet.h)
+        net/app_protocol/rtmp/rtmp_stack_packet.h av_device.cc av_device.h av_codec.cc av_codec.h)
 
-target_link_libraries(rtmp_client -lpthread -lcrypto -lssl -luv -lsrtp2 -lzlog -lglib-2.0 -lgthread-2.0)
+target_link_libraries(rtmp_client -lpthread -lcrypto -lssl -luv -lsrtp2 -lavcodec -lavutil -lzlog -lglib-2.0 -lgthread-2.0)
