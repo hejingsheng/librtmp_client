@@ -242,10 +242,10 @@ int RtmpHeader::encode_fmt0_chunk_header(uint8_t *data, int size)
     *p++ = msg_type_id;
     // message stream id 4 bytes
     q = (uint8_t*)&msg_stream_id;
-    *p++ = q[3];
-    *p++ = q[2];
-    *p++ = q[1];
     *p++ = q[0];
+    *p++ = q[1];
+    *p++ = q[2];
+    *p++ = q[3];
     if (timestamp >= RTMP_EXTENDED_TIMESTAMP)
     {
         q = (uint8_t*)&timestamp;
@@ -460,7 +460,7 @@ RtmpVideoPacket::RtmpVideoPacket() {
 
 }
 
-RtmpVideoPacket::~RtmpVideoPacket() noexcept {
+RtmpVideoPacket::~RtmpVideoPacket() {
 
 }
 
@@ -472,6 +472,7 @@ int RtmpVideoPacket::encode_pkg(uint8_t *payload, int size)
 {
     int offset = 0;
     uint8_t *q;
+
     if (keyframe) {
         payload[offset++] = 0x17;
     }
@@ -479,10 +480,13 @@ int RtmpVideoPacket::encode_pkg(uint8_t *payload, int size)
         payload[offset++] = 0x27;
     }
     payload[offset++] = 0x01;
-    q = (uint8_t*)&timestamp;
-    payload[offset++] = q[2];
-    payload[offset++] = q[1];
-    payload[offset++] = q[0];
+//    q = (uint8_t*)&timestamp;
+//    payload[offset++] = q[2];
+//    payload[offset++] = q[1];
+//    payload[offset++] = q[0];
+    payload[offset++] = 0x00;
+    payload[offset++] = 0x00;
+    payload[offset++] = 0x00;
     offset+= write_uint32(payload+offset, nalulen);
     memcpy(payload+offset, nalu, nalulen);
     offset += nalulen;
