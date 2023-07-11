@@ -12,11 +12,10 @@ int main() {
 
     NETIOMANAGER->init();
 
-    RtmpPublishClient *client = new RtmpPublishClient("live", "live1");
+    RtmpPublishClient *client = new RtmpPublishClient("rtmp://8.135.38.10:1935/live/live1");
     NetCore::IPAddr addr;
     addr.ip = "8.135.38.10";
     addr.port = 1935;
-    client->setRtmpServer(addr);
     client->start();
 
     NETIOMANAGER->startup();

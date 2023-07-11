@@ -215,10 +215,30 @@ public:
     virtual int get_msg_type() = 0;
 };
 
-//class RtmpAudioPacket : public RtmpBasePacket
-//{
-//
-//};
+class RtmpAudioPacket : public RtmpBasePacket
+{
+public:
+    // only pcmu
+    uint32_t timestamp;
+    uint8_t *data;
+    int datalen;
+
+public:
+    RtmpAudioPacket();
+    virtual ~RtmpAudioPacket();
+
+public:
+    virtual uint32_t getTimestamp();
+
+public:
+    virtual int encode_pkg(uint8_t *payload, int size);
+    virtual int decode(uint8_t *data, int len);
+    virtual int get_pkg_len();
+
+public:
+    virtual int get_cs_id();
+    virtual int get_msg_type();
+};
 
 class RtmpAVCPacket : public RtmpBasePacket
 {

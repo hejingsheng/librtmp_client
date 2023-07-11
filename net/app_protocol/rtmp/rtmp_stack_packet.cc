@@ -406,6 +406,58 @@ void RtmpChunkData::copy_payload(uint8_t *data, int len)
     current_payload_len += len;
 }
 
+RtmpAudioPacket::RtmpAudioPacket()
+{
+
+}
+
+RtmpAudioPacket::~RtmpAudioPacket()
+{
+
+}
+
+uint32_t RtmpAudioPacket::getTimestamp()
+{
+    return timestamp;
+}
+
+int RtmpAudioPacket::encode_pkg(uint8_t *payload, int size)
+{
+    int offset = 0;
+    /*
+     *  ++++    ++   +     +
+     * |format|rate|bits|channel
+     * pcmu  0x08 (4bits)
+     * rate  5.5k 0  11k 1  22k  2  44k  3 (2bits)
+     * bits  8bits 0  16bits 1 (1bits)
+     * channel  0 mono  1 stereo  (1bits)
+     */
+    payload[offset++] = 0x82;  //1000 00 1 0
+    memcpy(payload+offset, data, datalen);
+    offset += datalen;
+    return 0;
+}
+
+int RtmpAudioPacket::decode(uint8_t *data, int len)
+{
+    return 0;
+}
+
+int RtmpAudioPacket::get_pkg_len()
+{
+    // pcmu format
+    return 1 + datalen;
+}
+int RtmpAudioPacket::get_cs_id()
+{
+    return RTMP_CID_Audio;
+}
+
+int RtmpAudioPacket::get_msg_type()
+{
+    return RTMP_MSG_AudioMessage;
+}
+
 RtmpAVCPacket::RtmpAVCPacket() {
 
 }
@@ -472,6 +524,7 @@ int RtmpVideoPacket::encode_pkg(uint8_t *payload, int size)
 {
     int offset = 0;
     uint8_t *q;
+    int time = 40;
 
     if (keyframe) {
         payload[offset++] = 0x17;
@@ -487,7 +540,7 @@ int RtmpVideoPacket::encode_pkg(uint8_t *payload, int size)
     payload[offset++] = 0x00;
     payload[offset++] = 0x00;
     payload[offset++] = 0x00;
-    offset+= write_uint32(payload+offset, nalulen);
+    offset += write_uint32(payload+offset, nalulen);
     memcpy(payload+offset, nalu, nalulen);
     offset += nalulen;
     return 0;

@@ -5,6 +5,16 @@
 #include "av_codec.h"
 #include "logger.h"
 
+char startcode[4] = {0x00,0x00,0x00,0x01};
+static void write_to_file(void *data, int len)
+{
+    FILE *fp;
+    fp = fopen("record.h264", "ab");
+    //fwrite(&len, sizeof(int), 1, fp);
+    fwrite(data, len, 1, fp);
+    fclose(fp);
+}
+
 MediaData::MediaData()
 {
     data_ = nullptr;
@@ -235,7 +245,7 @@ int AudioCodec::initCodec(int32_t sampleRate, int32_t bitRate, int32_t channels)
     return 0;
 }
 
-int AudioCodec::encode(char *pcm, int len, int64_t pts, int64_t dts, std::vector<AudioMediaPacketData *> &pkts) {
+int AudioCodec::encode(char *pcm, int len, int64_t pts, int64_t dts, std::vector<MediaPacketShareData *> &pkts) {
     int ret;
 
     av_init_packet(encode_pkt);
@@ -249,9 +259,10 @@ int AudioCodec::encode(char *pcm, int len, int64_t pts, int64_t dts, std::vector
     ret = avcodec_send_frame(encode_codec_ctx, encode_frame);
     if (ret < 0) {
         ELOG("send frame fail\n");
+        av_strerror(ret, av_errors, 1024);
         return -1;
     }
-    while (ret > 0)
+    while (ret >= 0)
     {
         ret = avcodec_receive_packet(encode_codec_ctx, encode_pkt);
         if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) {
@@ -275,7 +286,9 @@ int AudioCodec::encode(char *pcm, int len, int64_t pts, int64_t dts, std::vector
         //decode((char*)encode_pkt->data, encode_pkt->size);
         media->pts = pts;
         media->dts = dts;
-        pkts.push_back(media);
+        MediaPacketShareData *data = new MediaPacketShareData();
+        data->create(media, 0);
+        pkts.push_back(data);
         av_packet_unref(encode_pkt);
     }
     return 0;
@@ -310,9 +323,9 @@ int AudioCodec::decode(char *data, int len) {
     return 0;
 }
 
-int AudioCodec::freePackets(std::vector<AudioMediaPacketData *> &pkts) {
+int AudioCodec::freePackets(std::vector<MediaPacketShareData *> &pkts) {
     for (auto iter = pkts.begin(); iter != pkts.end(); iter++) {
-        AudioMediaPacketData *pkg = *iter;
+        MediaPacketShareData *pkg = *iter;
         if (pkg) {
             delete pkg;
         }
@@ -325,6 +338,7 @@ int AudioCodec::initEncodeCodec(int32_t sampleRate, int32_t bitRate, int32_t cha
 
     // init encoder
     const AVCodec *audio_codec = avcodec_find_encoder_by_name(codec_name_.c_str());
+    //const AVCodec *audio_codec = avcodec_find_encoder(AV_CODEC_ID_PCM_MULAW);
     if (audio_codec == NULL) {
         ELOG("not find audio codec %s\n", codec_name_.c_str());
         return -1;
@@ -350,8 +364,10 @@ int AudioCodec::initEncodeCodec(int32_t sampleRate, int32_t bitRate, int32_t cha
         return -1;
     }
     encode_frame->nb_samples = encode_codec_ctx->frame_size;
+    encode_frame->nb_samples = 160;
     encode_frame->format = encode_codec_ctx->sample_fmt;
     encode_frame->channels = encode_codec_ctx->channels;
+    av_channel_layout_copy(&encode_frame->ch_layout, &encode_codec_ctx->ch_layout);
     //encode_frame->channel_layout = encode_codec_ctx->channel_layout;
     //encode_frame->time_base = encode_codec_ctx->time_base;
     ret = av_frame_get_buffer(encode_frame, 0);
@@ -617,7 +633,10 @@ void VideoCodec::parseH264(uint8_t *h264, int len, int64_t pts, int64_t dts, std
                 {
                     media->keyframe_ = true;
                     media->copySpspps(encode_codec_ctx->extradata, encode_codec_ctx->extradata_size);
+                    //write_to_file(encode_codec_ctx->extradata, encode_codec_ctx->extradata_size);
                 }
+                //write_to_file(startcode, 4);
+                //write_to_file(&nalus[0], nalus.size());
                 MediaPacketShareData *data = new MediaPacketShareData();
                 data->create(media, 1);
                 pkts.push_back(data);
@@ -637,7 +656,10 @@ void VideoCodec::parseH264(uint8_t *h264, int len, int64_t pts, int64_t dts, std
         {
             media->keyframe_ = true;
             media->copySpspps(encode_codec_ctx->extradata, encode_codec_ctx->extradata_size);
+            //write_to_file(encode_codec_ctx->extradata, encode_codec_ctx->extradata_size);
         }
+        //write_to_file(startcode, 4);
+        //write_to_file(&nalus[0], nalus.size());
         MediaPacketShareData *data = new MediaPacketShareData();
         data->create(media, 1);
         pkts.push_back(data);

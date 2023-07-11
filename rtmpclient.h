@@ -29,16 +29,25 @@ enum RtmpClientPushPullStatus {
     RTMP_PUSH_OR_PULL,
 };
 
-class RtmpPublishClient : public NetCore::ISocketCallback, public VideoDataTransport {
+class RtmpClient : public NetCore::ISocketCallback {
 
 public:
-    RtmpPublishClient(std::string app, std::string stream);
-    ~RtmpPublishClient();
+    RtmpClient(std::string rtmpurl, int dir);
+    virtual ~RtmpClient();
 
 public:
-    void setRtmpServer(NetCore::IPAddr &server);
-    void start();
-    void stop();
+    virtual void start();
+    virtual void stop();
+
+protected:
+    virtual void startPushStream();
+    virtual void startPullStream();
+    virtual void stopPushStream();
+    virtual void stopPullStream();
+
+protected:
+    virtual void onPublishStart();
+    virtual void onPublishStop();
 
 protected:
     virtual int onConnect(int status, NetCore::BaseSocket *pSock);
@@ -46,51 +55,104 @@ protected:
     virtual int onClose(NetCore::BaseSocket *pSock);
 
 protected:
-    virtual int YuvDataIsAvailable(const void* yuvData, const uint32_t len, const int32_t width, const int32_t height);
+    virtual void onStoped();
 
-private:
+protected:
     void doHandshake(const char *data, int size);
     void connectApp();
     void createStream(std::string stream);
-    void publish(std::string stream, int streamid);
-    void sendMetaData();
 
-private:
+protected:
     void sendRtmpPacket(RtmpBasePacket *pkg, int streamid);
     void sendData(const char *data, int len);
-    int processData(const char *data, int length);
+    void processData(const char *data, int length);
+
+protected:
+    std::string rtmp_app_;
+    std::string rtmp_stream_;
+
+protected:
+    rtmp_handshake handshake;
+    RtmpClientHandshakeStatus status_;
+    RtmpClientPushPullStatus pushPullStatus_;
+    RtmpMessageTransport *rtmp_transport_;
+    int streamid;
+    bool havestop;
+
+protected:
+    NetCore::IPAddr serveraddr_;
+    NetCore::TcpSocket *rtmp_socket_;
+    DataCacheBuf *data_cache_;
+
+protected:
+    int dir; // 0 push  1 pull
+};
+
+class RtmpPublishClient : public RtmpClient, public VideoDataTransport, public AudioDataTransport {
+
+public:
+    RtmpPublishClient(std::string url);
+    virtual ~RtmpPublishClient();
+
+protected:
+    virtual void startPushStream();
+    virtual void stopPushStream();
+    virtual void onPublishStart();
+    virtual void onPublishStop();
+
+protected:
+    virtual int YuvDataIsAvailable(const void* yuvData, const uint32_t len, const int32_t width, const int32_t height);
+    virtual int RecordDataIsAvailable(const void* audioData,
+                                      const int32_t nSamples,
+                                      const int32_t nBitsPerSample,
+                                      const int32_t nChannels,
+                                      const uint32_t nSampleRate,
+                                      const int32_t nFrameDurationMs);
+    virtual int PlayNeedMordData(const int32_t nSamples,
+                                 const int32_t nBitsPerSample,
+                                 const int32_t nChannels,
+                                 const uint32_t nSampleRate,
+                                 const int32_t nFrameDurationMs,
+                                 void *audioData,
+                                 int32_t &nSamplesOut);
+
+private:
+    void sendMetaData();
+    void publish(std::string stream, int streamid);
 
 private:
     void onTimer();
     static void on_uv_timer(uv_timer_t *handle);
 
 private:
-    std::string rtmp_app_;
-    std::string rtmp_stream_;
-
-private:
-    rtmp_handshake handshake;
-    RtmpClientHandshakeStatus status_;
-    RtmpClientPushPullStatus pushPullStatus_;
-    RtmpMessageTransport *rtmp_transport_;
-    int streamid;
-
-private:
-    NetCore::IPAddr serveraddr_;
-    NetCore::TcpSocket *rtmp_socket_;
-    DataCacheBuf *data_cache_;
-    uv_timer_t *timer_;
-
-private:
     BaseDevices *video_device_;
     VideoCodec *video_codec_;
     int64_t video_pts;
     int64_t video_dts;
-    uint32_t timestamp;
+    BaseDevices *audio_device_;
+    AudioCodec *audio_codec_;
+    int64_t audio_pts;
+    int64_t audio_dts;
+    uint32_t video_timestamp;
+    uint32_t audio_timestamp;
+
+private:
+    uv_timer_t *timer_;
 
 private:
     std::list<MediaPacketShareData*> datalist;
     std::recursive_mutex data_mutex;
+};
+
+class RtmpPlayClient : public RtmpClient {
+
+public:
+    RtmpPlayClient(std::string url);
+    virtual ~RtmpPlayClient();
+
+protected:
+    virtual void startPullStream();
+    virtual void stopPullStream();
 };
 
 #endif //RTMP_CLIENT_RTMPCLIENT_H

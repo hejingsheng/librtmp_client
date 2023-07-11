@@ -37,12 +37,12 @@ static void generalPcmData(void *audio_samples, int32_t num_samples, int32_t sam
     FILE *fp;
     int16_t *ptr16Out = nullptr;
 
-    fp = fopen("source1.pcm", "r");
+    fp = fopen("source1_8k.pcm", "r");
     fseek(fp, currentPos, 0);
-    int16_t sample[960];
-    fread(sample, sizeof(int16_t), 960, fp);
-    currentPos += (960 * sizeof(int16_t));
-    if (currentPos >= 5760000)
+    int16_t sample[160];
+    fread(sample, sizeof(int16_t), 160, fp);
+    currentPos += (160 * sizeof(int16_t));
+    if (currentPos >= 960000)
     {
         currentPos = 0;
     }
@@ -337,7 +337,7 @@ void AudioDevices::AudioDeviceThread()
             }
         }
         sleepMutex_.lock();
-        audioThreadCond_.wait_for(sleepMutex_, std::chrono::milliseconds(nFrameDuration_ - 1));
+        audioThreadCond_.wait_for(sleepMutex_, std::chrono::milliseconds(5 - 1));
         sleepMutex_.unlock();
     }
     ILOG("audio device thread end\n");
@@ -481,7 +481,7 @@ void VideoDevices::VideoDeviceThread()
             }
         }
         sleepMutex_.lock();
-        videoThreadCond_.wait_for(sleepMutex_, std::chrono::milliseconds(nFrameDuration_ - 1));
+        videoThreadCond_.wait_for(sleepMutex_, std::chrono::milliseconds(20 - 1));
         sleepMutex_.unlock();
     }
     ILOG("audio device thread end\n");

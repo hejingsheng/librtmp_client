@@ -109,9 +109,9 @@ public:
 
 public:
     int initCodec(int32_t sampleRate, int32_t bitRate, int32_t channels);
-    int encode(char *pcm, int len, int64_t pts, int64_t dts, std::vector<AudioMediaPacketData*> &pkts);
+    int encode(char *pcm, int len, int64_t pts, int64_t dts, std::vector<MediaPacketShareData*> &pkts);
     int decode(char *data, int len);
-    int freePackets(std::vector<AudioMediaPacketData*> &pkts);
+    int freePackets(std::vector<MediaPacketShareData*> &pkts);
 
 private:
     int initEncodeCodec(int32_t sampleRate, int32_t bitRate, int32_t channels);
