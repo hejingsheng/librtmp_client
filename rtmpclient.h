@@ -32,11 +32,11 @@ enum RtmpClientPushPullStatus {
 class RtmpClient : public NetCore::ISocketCallback {
 
 public:
-    RtmpClient(std::string rtmpurl, int dir);
+    RtmpClient(std::string rtmpurl, int dir, bool audio);
     virtual ~RtmpClient();
 
 public:
-    virtual void start();
+    virtual void start(uint32_t w, uint32_t h, uint32_t b);
     virtual void stop();
 
 protected:
@@ -86,12 +86,16 @@ protected:
 
 protected:
     int dir; // 0 push  1 pull
+    bool audio;
+    uint32_t width;
+    uint32_t heigth;
+    uint32_t bitrate;
 };
 
 class RtmpPublishClient : public RtmpClient, public VideoDataTransport, public AudioDataTransport {
 
 public:
-    RtmpPublishClient(std::string url);
+    RtmpPublishClient(std::string url, bool audio);
     virtual ~RtmpPublishClient();
 
 protected:
@@ -144,15 +148,5 @@ private:
     std::recursive_mutex data_mutex;
 };
 
-class RtmpPlayClient : public RtmpClient {
-
-public:
-    RtmpPlayClient(std::string url);
-    virtual ~RtmpPlayClient();
-
-protected:
-    virtual void startPullStream();
-    virtual void stopPullStream();
-};
 
 #endif //RTMP_CLIENT_RTMPCLIENT_H

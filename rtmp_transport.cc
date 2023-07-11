@@ -219,6 +219,7 @@ int RtmpMessageTransport::do_send_message(RtmpHeader *header, uint8_t *payload, 
         memcpy(send_cache_buf+index, header_data, header_length);
         index += header_length;
         int len = UTILS_MIN(out_chunk_size, (int)(end-start));
+        //ILOG("header len %d payload len %d data\n", header_length, len);
         memcpy(send_cache_buf+index, start, len);
         index += len;
         start += len;
@@ -227,6 +228,7 @@ int RtmpMessageTransport::do_send_message(RtmpHeader *header, uint8_t *payload, 
         {
             // cache not enough send data free it
             // send data
+            //ILOG("cache not enouth send first\n");
             socket_->sendData((const char*)send_cache_buf, index);
             index = 0;
         }
@@ -234,6 +236,7 @@ int RtmpMessageTransport::do_send_message(RtmpHeader *header, uint8_t *payload, 
     if (index > 0)
     {
         // send data
+        //ILOG("send %d data\n", index);
         socket_->sendData((const char*)send_cache_buf, index);
         index = 0;
     }

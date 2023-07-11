@@ -8,7 +8,7 @@
 #include "app_protocol/rtmp/rtmp_stack_packet.h"
 #include "autofree.h"
 
-RtmpClient::RtmpClient(std::string rtmpurl, int dir) {
+RtmpClient::RtmpClient(std::string rtmpurl, int dir, bool audio) {
     size_t pos = rtmpurl.find("rtmp://");
     std::string url = "";
     std::string addr = rtmpurl.substr(pos+strlen("rtmp://"));
@@ -33,6 +33,8 @@ RtmpClient::RtmpClient(std::string rtmpurl, int dir) {
     pushPullStatus_ = RTMP_CONNECT_APP;
     data_cache_ = new DataCacheBuf();
     rtmp_transport_ = nullptr;
+
+    this->audio = audio;
 }
 
 RtmpClient::~RtmpClient() {
@@ -43,11 +45,16 @@ RtmpClient::~RtmpClient() {
     }
 }
 
-void RtmpClient::start() {
+void RtmpClient::start(uint32_t w, uint32_t h, uint32_t b) {
     rtmp_socket_ = new NetCore::TcpSocket(NETIOMANAGER->loop_);
     rtmp_socket_->registerCallback(this);
     rtmp_socket_->connectServer(serveraddr_);
     rtmp_transport_ = new RtmpMessageTransport(rtmp_socket_);
+    if (dir == 0) {
+        width = w;
+        heigth = h;
+        bitrate = b;
+    }
 }
 
 void RtmpClient::stop() {
@@ -266,23 +273,15 @@ void RtmpClient::processData(const char *data, int length)
 }
 
 
-RtmpPublishClient::RtmpPublishClient(std::string url) : RtmpClient(url, 0) {
-    video_device_ = DevicesFactory::CreateVideoDevice("video", 640, 480, 25);
-    video_device_->registerVideoCallback(this);
-    video_device_->Init();
-
-    video_codec_ = new VideoCodec(VIDEO_CODEC_NAME);
-    video_codec_->initCodec(640, 480, 400000, 25);
+RtmpPublishClient::RtmpPublishClient(std::string url, bool audio) : RtmpClient(url, 0, audio) {
+    video_device_ = nullptr;
+    video_codec_ = nullptr;
     video_pts = video_dts = 0;
-
-    audio_device_ = DevicesFactory::CreateAudioDevice("audio", 8000, 16, 1, 20);
-    audio_device_->registerAudioCallback(this);
-    audio_device_->Init();
-
-    audio_codec_ = new AudioCodec("pcm_mulaw");
-    audio_codec_->initCodec(8000, 64000, 1);
-    audio_dts = audio_pts = 0;
-
+    if (audio) {
+        audio_device_ = nullptr;
+        audio_codec_ = nullptr;
+        audio_dts = audio_pts = 0;
+    }
     video_timestamp = 0;
     audio_timestamp = 0;
     datalist.clear();
@@ -295,8 +294,12 @@ RtmpPublishClient::RtmpPublishClient(std::string url) : RtmpClient(url, 0) {
 RtmpPublishClient::~RtmpPublishClient() {
     DLOG("destroy rtmp publish client\n");
     delete timer_;
-    delete video_device_;
-    delete video_codec_;
+    if (video_device_) {
+        delete video_device_;
+    }
+    if (audio_device_) {
+        delete video_codec_;
+    }
     for (auto iter = datalist.begin(); iter != datalist.end(); ++iter) {
         MediaPacketShareData *data = *iter;
         if (data) {
@@ -316,14 +319,31 @@ void RtmpPublishClient::stopPushStream() {
 }
 
 void RtmpPublishClient::onPublishStart() {
+    video_device_ = DevicesFactory::CreateVideoDevice("video", width, heigth, 25);
+    video_device_->registerVideoCallback(this);
+    video_device_->Init();
+
+    video_codec_ = new VideoCodec(VIDEO_CODEC_NAME);
+    video_codec_->initCodec(width, heigth, bitrate, 25);
+    video_pts = video_dts = 0;
+
+    if (audio) {
+        audio_device_ = DevicesFactory::CreateAudioDevice("audio", 8000, 16, 1, 20);
+        audio_device_->registerAudioCallback(this);
+        audio_device_->Init();
+
+        audio_codec_ = new AudioCodec("pcm_mulaw");
+        audio_codec_->initCodec(8000, 64000, 1);
+        audio_dts = audio_pts = 0;
+    }
     sendMetaData();
 }
 
 void RtmpPublishClient::onPublishStop() {
-    if (video_device_->Recording()) {
+    if (video_device_ && video_device_->Recording()) {
         video_device_->StopRecord();
     }
-    if (audio_device_->Recording()) {
+    if (audio_device_ && audio_device_->Recording()) {
         audio_device_->StopRecord();
     }
     uv_timer_stop(timer_);
@@ -335,13 +355,12 @@ void RtmpPublishClient::onPublishStop() {
 
 int RtmpPublishClient::YuvDataIsAvailable(const void* yuvData, const uint32_t len, const int32_t width, const int32_t height)
 {
-    std::vector<MediaPacketShareData*> outpkts;
+    std::vector<MediaPacketShareData *> outpkts;
     int ret;
-    ret = video_codec_->encode((char*)yuvData, len, video_pts++, video_dts++, outpkts);
+    ret = video_codec_->encode((char *) yuvData, len, video_pts++, video_dts++, outpkts);
     if (ret >= 0) {
         if (!outpkts.empty()) {
-            for (auto iter = outpkts.begin(); iter != outpkts.end(); ++iter)
-            {
+            for (auto iter = outpkts.begin(); iter != outpkts.end(); ++iter) {
                 MediaPacketShareData *data = *iter;
                 MediaPacketShareData *copy = data->copy();
                 {
@@ -362,22 +381,23 @@ int RtmpPublishClient::RecordDataIsAvailable(const void* audioData,
                                   const uint32_t nSampleRate,
                                   const int32_t nFrameDurationMs)
 {
-    std::vector<MediaPacketShareData*> outpkts;
-    int ret;
-    int len = nChannels * nSamples * nBitsPerSample/8;
-    ret = audio_codec_->encode((char*)audioData, len, audio_pts++, audio_dts++, outpkts);
-    if (ret >= 0) {
-        if (!outpkts.empty()) {
-            for (auto iter = outpkts.begin(); iter != outpkts.end(); ++iter)
-            {
-                MediaPacketShareData *data = *iter;
-                MediaPacketShareData *copy = data->copy();
-                {
-                    std::lock_guard<std::recursive_mutex> lock(data_mutex);
-                    datalist.push_back(copy);
+    if (audio) {
+        std::vector<MediaPacketShareData *> outpkts;
+        int ret;
+        int len = nChannels * nSamples * nBitsPerSample / 8;
+        ret = audio_codec_->encode((char *) audioData, len, audio_pts++, audio_dts++, outpkts);
+        if (ret >= 0) {
+            if (!outpkts.empty()) {
+                for (auto iter = outpkts.begin(); iter != outpkts.end(); ++iter) {
+                    MediaPacketShareData *data = *iter;
+                    MediaPacketShareData *copy = data->copy();
+                    {
+                        std::lock_guard<std::recursive_mutex> lock(data_mutex);
+                        datalist.push_back(copy);
+                    }
                 }
+                audio_codec_->freePackets(outpkts);
             }
-            audio_codec_->freePackets(outpkts);
         }
     }
     return 0;
@@ -398,19 +418,23 @@ void RtmpPublishClient::sendMetaData()
 {
     RtmpOnMetaDataPacket *pkg = new RtmpOnMetaDataPacket();
     pkg->metadata->set("duration", RtmpAmf0Any::number(0));
-    pkg->metadata->set("width", RtmpAmf0Any::number(768));
-    pkg->metadata->set("height", RtmpAmf0Any::number(320));
+    pkg->metadata->set("width", RtmpAmf0Any::number(width));
+    pkg->metadata->set("height", RtmpAmf0Any::number(heigth));
     pkg->metadata->set("framerate", RtmpAmf0Any::number(25));
     pkg->metadata->set("videocodecid", RtmpAmf0Any::number(7));
-    pkg->metadata->set("audiocodecid", RtmpAmf0Any::number(8));
-    pkg->metadata->set("audiosamplerate", RtmpAmf0Any::number(8000));
-    pkg->metadata->set("audiosamplesize", RtmpAmf0Any::number(16));
-    pkg->metadata->set("stereo", RtmpAmf0Any::boolean(false));
+    if (audio) {
+        pkg->metadata->set("audiocodecid", RtmpAmf0Any::number(8));
+        pkg->metadata->set("audiosamplerate", RtmpAmf0Any::number(8000));
+        pkg->metadata->set("audiosamplesize", RtmpAmf0Any::number(16));
+        pkg->metadata->set("stereo", RtmpAmf0Any::boolean(false));
+    }
     sendRtmpPacket(pkg, streamid);
     video_device_->InitRecordDevice();
     video_device_->StartRecord();
-    audio_device_->InitRecordDevice();
-    audio_device_->StartRecord();
+    if (audio) {
+        audio_device_->InitRecordDevice();
+        audio_device_->StartRecord();
+    }
     uv_timer_start(timer_, &RtmpPublishClient::on_uv_timer, 20, 20);
 }
 
@@ -481,20 +505,4 @@ void RtmpPublishClient::on_uv_timer(uv_timer_t *handle)
 {
     RtmpPublishClient *data = static_cast<RtmpPublishClient*>(handle->data);
     data->onTimer();
-}
-
-RtmpPlayClient::RtmpPlayClient(std::string url) : RtmpClient(url, 1)  {
-
-}
-
-RtmpPlayClient::~RtmpPlayClient() {
-
-}
-
-void RtmpPlayClient::startPullStream() {
-
-}
-
-void RtmpPlayClient::stopPullStream() {
-
 }
