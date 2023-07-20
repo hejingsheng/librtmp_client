@@ -184,20 +184,35 @@ void RtmpClient::connectApp()
 
 void RtmpClient::createStream(std::string stream)
 {
-    if (true) {
-        RtmpFMLEStartPacket *pkg = RtmpFMLEStartPacket::create_release_stream(stream);
-        sendRtmpPacket(pkg, 0);
-    }
+    if (dir == 0) {
+        if (true) {
+            RtmpFMLEStartPacket *pkg = RtmpFMLEStartPacket::create_release_stream(stream);
+            sendRtmpPacket(pkg, 0);
+        }
 
-    if (true) {
-        RtmpFMLEStartPacket *pkg = RtmpFMLEStartPacket::create_FC_publish(stream);
-        sendRtmpPacket(pkg, 0);
-    }
+        if (true) {
+            RtmpFMLEStartPacket *pkg = RtmpFMLEStartPacket::create_FC_publish(stream);
+            sendRtmpPacket(pkg, 0);
+        }
 
-    if (true) {
+        if (true) {
+            RtmpCreateStreamPacket *pkg = new RtmpCreateStreamPacket();
+            pkg->number = 4;
+            sendRtmpPacket(pkg, 0);
+        }
+    }
+    else {
         RtmpCreateStreamPacket *pkg = new RtmpCreateStreamPacket();
-        pkg->number = 4;
+        pkg->number = 2;
         sendRtmpPacket(pkg, 0);
+        if (true) {
+            RtmpCallPacket *pkg = new RtmpCallPacket();
+            pkg->command_name = "_checkbw";
+            pkg->number = 3;
+            pkg->object = RtmpAmf0Any::null();
+            pkg->args = nullptr;
+            sendRtmpPacket(pkg, 0);
+        }
     }
     pushPullStatus_ = RTMP_CREATE_STREAM;
 }
@@ -505,4 +520,45 @@ void RtmpPublishClient::on_uv_timer(uv_timer_t *handle)
 {
     RtmpPublishClient *data = static_cast<RtmpPublishClient*>(handle->data);
     data->onTimer();
+}
+
+RtmpPlayClient::RtmpPlayClient(std::string url, bool audio) : RtmpClient(url, 1, audio)
+{
+
+}
+
+RtmpPlayClient::~RtmpPlayClient() {
+
+}
+
+void RtmpPlayClient::startPullStream() {
+    play(rtmp_app_, streamid);
+}
+
+void RtmpPlayClient::stopPullStream() {
+
+}
+
+void RtmpPlayClient::play(std::string stream, int streamid) {
+    if (true) {
+        RtmpCallPacket *pkg = new RtmpCallPacket();
+        pkg->command_name = "getStreamLength";
+        pkg->number = 4;
+        pkg->object = RtmpAmf0Any::null();
+        pkg->args = RtmpAmf0Any::str(rtmp_app_.c_str());
+        sendRtmpPacket(pkg, 0);
+    }
+    if (true) {
+        RtmpPlayPacket *pkg = new RtmpPlayPacket();
+        pkg->number = 5;
+        pkg->stream_name = stream;
+        pkg->start = -1;
+        sendRtmpPacket(pkg, streamid);
+    }
+    if (true) {
+        RtmpUserControlPacket *pkg = new RtmpUserControlPacket();
+        pkg->event_type = RtmpPCUCSetBufferLength;
+        pkg->extra_data = 3;
+        sendRtmpPacket(pkg, 0);
+    }
 }

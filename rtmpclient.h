@@ -148,5 +148,18 @@ private:
     std::recursive_mutex data_mutex;
 };
 
+class RtmpPlayClient : public RtmpClient {
+
+public:
+    RtmpPlayClient(std::string url, bool audio);
+    virtual ~RtmpPlayClient();
+
+protected:
+    virtual void startPullStream();
+    virtual void stopPullStream();
+
+private:
+    void play(std::string stream, int streamid);
+};
 
 #endif //RTMP_CLIENT_RTMPCLIENT_H
