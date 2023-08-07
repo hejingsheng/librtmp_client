@@ -51,6 +51,7 @@ private:
     int do_recv_payload(RtmpChunkData *chunk, uint8_t *data, int length, bool &finish);
     int on_recv_message(RtmpMessage *msg);
     int on_send_message(RtmpBasePacket *pkg);
+    int decode_media_msg(RtmpMessage *msg, RtmpBasePacket **ppacket);
     int decode_msg(RtmpMessage *msg, RtmpBasePacket **ppacket);
 
 private:

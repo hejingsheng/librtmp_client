@@ -8,6 +8,24 @@
 #include "app_protocol/rtmp/rtmp_stack_packet.h"
 #include "autofree.h"
 
+FILE *fp;
+
+int write_spspps_data(uint8_t *sps, int spslen, uint8_t *pps, int ppslen) {
+    char startCode[4] = {0x00,0x00,0x00,0x01};
+    fwrite(startCode, 1, 4, fp);
+    fwrite(sps, 1, spslen, fp);
+    fwrite(startCode, 1, 4, fp);
+    fwrite(pps, 1, ppslen, fp);
+    return 0;
+}
+
+int write_frame_data(uint8_t *nalu, int len) {
+    char startCode[4] = {0x00,0x00,0x00,0x01};
+    fwrite(startCode, 1, 4, fp);
+    fwrite(nalu, 1, len, fp);
+    return 0;
+}
+
 RtmpClient::RtmpClient(std::string rtmpurl, int dir, bool audio) {
     size_t pos = rtmpurl.find("rtmp://");
     std::string url = "";
@@ -87,6 +105,15 @@ void RtmpClient::onPublishStart() {
 }
 
 void RtmpClient::onPublishStop() {
+
+}
+
+void RtmpClient::onPlayStart() {
+
+}
+
+void RtmpClient::processPlayOrPublishPkg(RtmpBasePacket *packet)
+{
 
 }
 
@@ -279,8 +306,13 @@ void RtmpClient::processData(const char *data, int length)
                             havestop = true;
                             onPublishStop();
                         }
+                        else if (value == "NetStream.Play.Start") {
+                            onPlayStart();
+                        }
                     }
-
+                }
+                else {
+                    processPlayOrPublishPkg(packet);
                 }
             }
         }
@@ -482,19 +514,16 @@ void RtmpPublishClient::onTimer()
                 VideoMediaPacketData *data = dynamic_cast<VideoMediaPacketData*>(media->media);
                 if (data != nullptr) {
                     if (data->keyframe_) {
-                        RtmpAVCPacket *pkg = new RtmpAVCPacket();
-                        pkg->sps = data->sps_;
-                        pkg->spslen = data->spslen_;
-                        pkg->pps = data->pps_;
-                        pkg->ppslen = data->ppslen_;
+                        RtmpAVCPacket *pkg = new RtmpAVCPacket(data->spslen_, data->ppslen_);
+                        memcpy(pkg->sps, data->sps_, data->spslen_);
+                        memcpy(pkg->pps, data->pps_, data->ppslen_);
                         sendRtmpPacket(pkg, streamid);
                     }
-                    RtmpVideoPacket *pkg = new RtmpVideoPacket();
+                    RtmpVideoPacket *pkg = new RtmpVideoPacket(data->datalen_);
                     pkg->timestamp = video_timestamp;
                     video_timestamp += 40;
                     pkg->keyframe = data->keyframe_;
-                    pkg->nalu = data->data_;
-                    pkg->nalulen = data->datalen_;
+                    memcpy(pkg->nalu, data->data_, data->datalen_);
                     sendRtmpPacket(pkg, streamid);
                 }
             }
@@ -502,11 +531,10 @@ void RtmpPublishClient::onTimer()
                 // audio
                 AudioMediaPacketData *data = dynamic_cast<AudioMediaPacketData*>(media->media);
                 if (data != nullptr) {
-                    RtmpAudioPacket *pkg = new RtmpAudioPacket();
+                    RtmpAudioPacket *pkg = new RtmpAudioPacket(data->datalen_);
                     pkg->timestamp = audio_timestamp;
                     audio_timestamp += 20;
-                    pkg->data = data->data_;
-                    pkg->datalen = data->datalen_;
+                    memcpy(pkg->data, data->data_, data->datalen_);
                     sendRtmpPacket(pkg, streamid);
                 }
             }
@@ -524,7 +552,7 @@ void RtmpPublishClient::on_uv_timer(uv_timer_t *handle)
 
 RtmpPlayClient::RtmpPlayClient(std::string url, bool audio) : RtmpClient(url, 1, audio)
 {
-
+    fp = fopen("test.h264", "w");
 }
 
 RtmpPlayClient::~RtmpPlayClient() {
@@ -537,6 +565,29 @@ void RtmpPlayClient::startPullStream() {
 
 void RtmpPlayClient::stopPullStream() {
 
+}
+
+void RtmpPlayClient::onPlayStart() {
+    ILOG("stream play start\n");
+}
+
+void RtmpPlayClient::processPlayOrPublishPkg(RtmpBasePacket *packet) {
+    if (dynamic_cast<RtmpVideoPacket*>(packet) != nullptr) {
+        RtmpVideoPacket *pkg = dynamic_cast<RtmpVideoPacket*>(packet);
+        //ILOG("video packet, %x, %d\n", pkg->nalu[0], pkg->nalulen);
+        write_frame_data(pkg->nalu, pkg->nalulen);
+    }
+    else if (dynamic_cast<RtmpAudioPacket*>(packet) != nullptr) {
+
+    }
+    else if (dynamic_cast<RtmpAVCPacket*>(packet) != nullptr) {
+        RtmpAVCPacket *pkg = dynamic_cast<RtmpAVCPacket*>(packet);
+        //ILOG("avc packet, %x,%d\n", pkg->sps[0],pkg->spslen);
+        write_spspps_data(pkg->sps, pkg->spslen, pkg->pps, pkg->ppslen);
+    }
+    else {
+
+    }
 }
 
 void RtmpPlayClient::play(std::string stream, int streamid) {
@@ -561,4 +612,5 @@ void RtmpPlayClient::play(std::string stream, int streamid) {
         pkg->extra_data = 3;
         sendRtmpPacket(pkg, 0);
     }
+    pushPullStatus_ = RTMP_PUSH_OR_PULL;
 }

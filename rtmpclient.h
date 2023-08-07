@@ -48,6 +48,10 @@ protected:
 protected:
     virtual void onPublishStart();
     virtual void onPublishStop();
+    virtual void onPlayStart();
+
+protected:
+    virtual void processPlayOrPublishPkg(RtmpBasePacket *packet);
 
 protected:
     virtual int onConnect(int status, NetCore::BaseSocket *pSock);
@@ -157,6 +161,8 @@ public:
 protected:
     virtual void startPullStream();
     virtual void stopPullStream();
+    virtual void onPlayStart();
+    virtual void processPlayOrPublishPkg(RtmpBasePacket *packet);
 
 private:
     void play(std::string stream, int streamid);

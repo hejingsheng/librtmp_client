@@ -226,10 +226,17 @@ bool DataCacheBuf::require(int required_size)
 
 void DataCacheBuf::push_data(char *data, int size)
 {
-    if (length + size > MAX_CACHE_LEN)
+    if (length + size > nbytes)
     {
         //need realloc memory
         ILOG("need realloc buffer\n");
+        char *temp = new char[length + size + 2048];
+        nbytes = (length + size + 2048);
+        memcpy(temp, bytes, length);
+        memcpy(temp+length, data, size);
+        length += size;
+        delete[] bytes;
+        bytes = temp;
         return;
     }
     memcpy(bytes+length, data, size);

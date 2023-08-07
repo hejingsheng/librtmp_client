@@ -408,12 +408,20 @@ void RtmpChunkData::copy_payload(uint8_t *data, int len)
 
 RtmpAudioPacket::RtmpAudioPacket()
 {
+    data = nullptr;
+}
 
+RtmpAudioPacket::RtmpAudioPacket(int len)
+{
+    data = new uint8_t[len];
+    datalen = len;
 }
 
 RtmpAudioPacket::~RtmpAudioPacket()
 {
-
+    if (data) {
+        delete[] data;
+    }
 }
 
 uint32_t RtmpAudioPacket::getTimestamp()
@@ -440,6 +448,10 @@ int RtmpAudioPacket::encode_pkg(uint8_t *payload, int size)
 
 int RtmpAudioPacket::decode(uint8_t *data, int len)
 {
+    flag = data[0];
+    datalen = len-1;
+    this->data = new uint8_t[datalen];
+    memcpy(this->data, data+1, datalen);
     return 0;
 }
 
@@ -459,11 +471,23 @@ int RtmpAudioPacket::get_msg_type()
 }
 
 RtmpAVCPacket::RtmpAVCPacket() {
+    sps = pps = nullptr;
+}
 
+RtmpAVCPacket::RtmpAVCPacket(int spslen, int ppslen) {
+    sps = new uint8_t[spslen];
+    this->spslen = spslen;
+    pps = new uint8_t[ppslen];
+    this->ppslen = ppslen;
 }
 
 RtmpAVCPacket::~RtmpAVCPacket() {
-
+    if (sps) {
+        delete[] sps;
+    }
+    if (pps) {
+        delete[] pps;
+    }
 }
 
 int RtmpAVCPacket::encode_pkg(uint8_t *payload, int size) {
@@ -493,6 +517,21 @@ int RtmpAVCPacket::encode_pkg(uint8_t *payload, int size) {
 }
 
 int RtmpAVCPacket::decode(uint8_t *data, int len) {
+    int offset = 0;
+
+    if (len < 11) {
+        return -1;
+    }
+    offset += 11;
+    offset += read_int16(data+offset, (int16_t*)&spslen);
+    sps = new uint8_t[spslen];
+    memcpy(sps, data+offset,spslen);
+    offset += spslen;
+    offset += 1;
+    offset += read_int16(data+offset, (int16_t*)&ppslen);
+    pps = new uint8_t[ppslen];
+    memcpy(pps, data+offset, ppslen);
+    offset += ppslen;
     return 0;
 }
 
@@ -509,11 +548,18 @@ int RtmpAVCPacket::get_msg_type() {
 }
 
 RtmpVideoPacket::RtmpVideoPacket() {
+    nalu = nullptr;
+}
 
+RtmpVideoPacket::RtmpVideoPacket(int len) {
+    nalu = new uint8_t[len];
+    nalulen = len;
 }
 
 RtmpVideoPacket::~RtmpVideoPacket() {
-
+    if (nalu) {
+        delete[] nalu;
+    }
 }
 
 uint32_t RtmpVideoPacket::getTimestamp() {
@@ -548,6 +594,22 @@ int RtmpVideoPacket::encode_pkg(uint8_t *payload, int size)
 
 int RtmpVideoPacket::decode(uint8_t *data, int len)
 {
+    int offset = 0;
+    uint8_t val;
+
+    val = data[offset];
+    offset++;
+    if (val == 0x17) {
+        keyframe = true;
+    }
+    else {
+        keyframe = false;
+    }
+    offset += 4;
+    offset += read_uint32(data+offset, (uint32_t*)&nalulen);
+    nalu = new uint8_t[nalulen];
+    memcpy(nalu, data+offset, nalulen);
+    offset += nalulen;
     return 0;
 }
 

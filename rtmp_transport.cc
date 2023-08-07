@@ -189,7 +189,14 @@ int RtmpMessageTransport::recvRtmpMessage(const char *data, int length, RtmpBase
         AutoFree(RtmpMessage, rtmpmsg);
         rtmpmsg->create_msg(&chunk->h, chunk->getPaylaod(), chunk->h.msg_length);
         on_recv_message(rtmpmsg);
-        decode_msg(rtmpmsg, ppkg);
+        if (rtmpmsg->rtmp_header.msg_type_id == RTMP_MSG_AudioMessage
+            || rtmpmsg->rtmp_header.msg_type_id == RTMP_MSG_VideoMessage) {
+            ILOG("video/audio msg\n");
+            decode_media_msg(rtmpmsg, ppkg);
+        }
+        else {
+            decode_msg(rtmpmsg, ppkg);
+        }
         chunk->reset();
     }
     return offset;
@@ -307,6 +314,10 @@ int RtmpMessageTransport::on_recv_message(RtmpMessage *msg)
             {
                 in_buffer_length = packet->event_data;
             }
+            if (packet->event_type == RtmpPCUCStreamBegin)
+            {
+                ILOG("stream begin\n");
+            }
             if (packet->event_type == RtmpPCUCPingRequest)
             {
                 // send ping message
@@ -393,6 +404,40 @@ int RtmpMessageTransport::on_send_message(RtmpBasePacket *pkg)
             break;
         default:
             return 0;
+    }
+    return 0;
+}
+
+int RtmpMessageTransport::decode_media_msg(RtmpMessage *msg, RtmpBasePacket **ppacket)
+{
+    int ret = 0;
+    int offset = 0;
+    //RtmpBasePacket *pkg = nullptr;
+    uint8_t *body = msg->rtmp_body;
+    uint32_t bodylen = msg->rtmp_body_len;
+
+    if (msg->rtmp_header.msg_type_id == RTMP_MSG_AudioMessage) {
+        // audio msg
+        RtmpAudioPacket *pkg = new RtmpAudioPacket();
+        pkg->timestamp = msg->rtmp_header.timestamp;
+        pkg->decode(body, bodylen);
+        *ppacket = pkg;
+    }
+    else {
+        // video msg
+        if (body[1] == 0x00) {
+            // avc packet
+            RtmpAVCPacket *pkg = new RtmpAVCPacket();
+            pkg->decode(body, bodylen);
+            *ppacket = pkg;
+        }
+        else if (body[1] == 0x01) {
+            // nalu packet
+            RtmpVideoPacket *pkg = new RtmpVideoPacket();
+            pkg->timestamp = msg->rtmp_header.timestamp;
+            pkg->decode(body, bodylen);
+            *ppacket = pkg;
+        }
     }
     return 0;
 }

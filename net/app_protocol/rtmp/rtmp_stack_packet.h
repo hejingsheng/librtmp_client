@@ -219,12 +219,14 @@ class RtmpAudioPacket : public RtmpBasePacket
 {
 public:
     // only pcmu
+    uint8_t flag;
     uint32_t timestamp;
     uint8_t *data;
     int datalen;
 
 public:
     RtmpAudioPacket();
+    RtmpAudioPacket(int len);
     virtual ~RtmpAudioPacket();
 
 public:
@@ -250,6 +252,7 @@ public:
 
 public:
     RtmpAVCPacket();
+    RtmpAVCPacket(int spslen, int ppslen);
     virtual ~RtmpAVCPacket();
 
 public:
@@ -272,6 +275,7 @@ public:
 
 public:
     RtmpVideoPacket();
+    RtmpVideoPacket(int len);
     virtual ~RtmpVideoPacket();
 
 public:
