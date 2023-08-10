@@ -6,6 +6,7 @@
 #include "autofree.h"
 #include "logger.h"
 #include "utils.h"
+#include "string.h"
 
 const uint32_t RTMP_DEFAULT_CHUNKSIZE = 128;
 const uint32_t RTMP_MAX_CHUNKSIZE = 65535;

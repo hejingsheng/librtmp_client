@@ -6,6 +6,7 @@
 #include "autofree.h"
 #include "netio.h"
 #include "logger.h"
+#include "string.h"
 
 RtmpHeader::RtmpHeader()
 {
@@ -409,6 +410,7 @@ void RtmpChunkData::copy_payload(uint8_t *data, int len)
 RtmpAudioPacket::RtmpAudioPacket()
 {
     data = nullptr;
+    datalen = 0;
 }
 
 RtmpAudioPacket::RtmpAudioPacket(int len)
@@ -472,6 +474,7 @@ int RtmpAudioPacket::get_msg_type()
 
 RtmpAVCPacket::RtmpAVCPacket() {
     sps = pps = nullptr;
+    spslen = ppslen = 0;
 }
 
 RtmpAVCPacket::RtmpAVCPacket(int spslen, int ppslen) {

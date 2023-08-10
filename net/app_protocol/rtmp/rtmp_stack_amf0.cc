@@ -4,6 +4,8 @@
 #include <vector>
 #include <sstream>
 #include "netio.h"
+#include "string.h"
+
 using namespace std;
 using namespace rtmp_internal;
 
