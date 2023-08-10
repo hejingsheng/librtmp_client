@@ -267,10 +267,25 @@ public:
 
 class RtmpVideoPacket : public RtmpBasePacket
 {
+    class H264Nalu
+    {
+    public:
+        uint8_t *nalu;
+        int nalulen;
+
+        H264Nalu() {
+            nalu = nullptr;
+            nalulen = 0;
+        }
+        ~H264Nalu() {
+            if (nalu) {
+                delete[] nalu;
+            }
+        }
+    };
 public:
     uint32_t timestamp;
-    uint8_t *nalu;
-    int nalulen;
+    std::vector<H264Nalu*> naluItem;
     bool keyframe;
 
 public:

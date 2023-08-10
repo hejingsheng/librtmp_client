@@ -523,7 +523,7 @@ void RtmpPublishClient::onTimer()
                     pkg->timestamp = video_timestamp;
                     video_timestamp += 40;
                     pkg->keyframe = data->keyframe_;
-                    memcpy(pkg->nalu, data->data_, data->datalen_);
+                    memcpy(pkg->naluItem[0]->nalu, data->data_, data->datalen_);
                     sendRtmpPacket(pkg, streamid);
                 }
             }
@@ -575,7 +575,9 @@ void RtmpPlayClient::processPlayOrPublishPkg(RtmpBasePacket *packet) {
     if (dynamic_cast<RtmpVideoPacket*>(packet) != nullptr) {
         RtmpVideoPacket *pkg = dynamic_cast<RtmpVideoPacket*>(packet);
         //ILOG("video packet, %x, %d\n", pkg->nalu[0], pkg->nalulen);
-        write_frame_data(pkg->nalu, pkg->nalulen);
+        for (int i = 0; i < pkg->naluItem.size(); i++) {
+            write_frame_data(pkg->naluItem[i]->nalu, pkg->naluItem[i]->nalulen);
+        }
     }
     else if (dynamic_cast<RtmpAudioPacket*>(packet) != nullptr) {
 

@@ -548,18 +548,22 @@ int RtmpAVCPacket::get_msg_type() {
 }
 
 RtmpVideoPacket::RtmpVideoPacket() {
-    nalu = nullptr;
+    naluItem.clear();
+    //nalu = nullptr;
 }
 
 RtmpVideoPacket::RtmpVideoPacket(int len) {
-    nalu = new uint8_t[len];
-    nalulen = len;
+    H264Nalu *nalu = new H264Nalu;
+    nalu->nalu = new uint8_t[len];
+    nalu->nalulen = len;
+    naluItem.push_back(nalu);
 }
 
 RtmpVideoPacket::~RtmpVideoPacket() {
-    if (nalu) {
-        delete[] nalu;
+    for (int i = 0; i < naluItem.size(); i++) {
+        delete naluItem[i];
     }
+    naluItem.clear();
 }
 
 uint32_t RtmpVideoPacket::getTimestamp() {
@@ -586,9 +590,9 @@ int RtmpVideoPacket::encode_pkg(uint8_t *payload, int size)
     payload[offset++] = 0x00;
     payload[offset++] = 0x00;
     payload[offset++] = 0x00;
-    offset += write_uint32(payload+offset, nalulen);
-    memcpy(payload+offset, nalu, nalulen);
-    offset += nalulen;
+    offset += write_uint32(payload+offset, naluItem[0]->nalulen);
+    memcpy(payload+offset, naluItem[0]->nalu, naluItem[0]->nalulen);
+    offset += naluItem[0]->nalulen;
     return 0;
 }
 
@@ -606,16 +610,20 @@ int RtmpVideoPacket::decode(uint8_t *data, int len)
         keyframe = false;
     }
     offset += 4;
-    offset += read_uint32(data+offset, (uint32_t*)&nalulen);
-    nalu = new uint8_t[nalulen];
-    memcpy(nalu, data+offset, nalulen);
-    offset += nalulen;
+    while(offset < len) {
+        H264Nalu *nalu = new H264Nalu;
+        offset += read_uint32(data + offset, (uint32_t *) &(nalu->nalulen));
+        nalu->nalu = new uint8_t[nalu->nalulen];
+        memcpy(nalu->nalu, data + offset, nalu->nalulen);
+        offset += nalu->nalulen;
+        naluItem.push_back(nalu);
+    }
     return 0;
 }
 
 int RtmpVideoPacket::get_pkg_len()
 {
-    return 1 + 1 + 3 + 4 + nalulen;
+    return 1 + 1 + 3 + 4 + naluItem[0]->nalulen;
 }
 
 int RtmpVideoPacket::get_cs_id()
