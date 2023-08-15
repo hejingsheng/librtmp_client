@@ -612,27 +612,15 @@ void STUNClient::startRetransmit()
 
 void STUNClient::stopTimer()
 {
-	if (uv_is_active((uv_handle_t*)retryTimer_))
+	uv_timer_stop(retryTimer_);
+	uv_close((uv_handle_t*)retryTimer_,
+		[](uv_handle_t* handle)
 	{
-		uv_timer_stop(retryTimer_);
-	}
-	if (uv_is_closing((uv_handle_t*)retryTimer_) == 0)
-	{
-		uv_close((uv_handle_t*)retryTimer_,
-			[](uv_handle_t* handle)
-		{
-			auto ptr = static_cast<STUNClient*>(handle->data);
-			//ptr->closeComplete();
-			ptr->onStopTimer();
-			//delete handle;
-		});
-	}
-	else
-	{
-		//closeComplete();
-		//close();
-		onStopTimer();
-	}
+		auto ptr = static_cast<STUNClient*>(handle->data);
+		//ptr->closeComplete();
+		ptr->onStopTimer();
+		//delete handle;
+	});
 }
 
 void STUNClient::onStopTimer()

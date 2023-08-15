@@ -53,6 +53,16 @@ void SSLCertificate::init()
 	RSA *rsa = NULL;
 	int bits = 1024;
 
+#if OPENSSL_VERSION_NUMBER < 0x10100000L // v1.1.x
+	//SSL初库始化
+	SSL_library_init();
+	//载入所有SSL算法
+	OpenSSL_add_ssl_algorithms();
+	//载入所有错误信息
+	SSL_load_error_strings();
+#else
+#endif
+
 	// Initialize SRTP first.
 	if (srtp_init() != 0)
 	{

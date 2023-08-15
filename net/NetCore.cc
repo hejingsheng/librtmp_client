@@ -320,26 +320,15 @@ namespace NetCore
 	void WebSocketClient::closeWs()
 	{
 		wsProtocol_->close();
-		if (uv_is_active((uv_handle_t*)pingTimer_))
+		uv_timer_stop(pingTimer_);
+		uv_close((uv_handle_t*)pingTimer_,
+			[](uv_handle_t* handle)
 		{
-			uv_timer_stop(pingTimer_);
-		}
-		if (uv_is_closing((uv_handle_t*)pingTimer_) == 0)
-		{
-			uv_close((uv_handle_t*)pingTimer_,
-				[](uv_handle_t* handle)
-			{
-				auto ptr = static_cast<WebSocketClient*>(handle->data);
-				//ptr->closeComplete();
-				ptr->close();
-				delete handle;
-			});
-		}
-		else
-		{
-			//closeComplete();
-			close();
-		}
+			auto ptr = static_cast<WebSocketClient*>(handle->data);
+			//ptr->closeComplete();
+			ptr->close();
+			delete handle;
+		});
 	}
 
 	void WebSocketClient::onConnect(int status)
@@ -924,6 +913,7 @@ namespace NetCore
     {
         content_len = len;
     }
+
 	void HttpResponseWriter::write(TcpSocketServer *server)
 	{
 	    std::stringstream ss;
@@ -1062,7 +1052,7 @@ namespace NetCore
 		}
 	}
 
-	TcpSocketConn::TcpSocketConn(uv_loop_t *loop, uv_tcp_t *tcp, bool ws, bool tls) : BaseSocket(loop, 0), tcp_(tcp)
+    TcpSocketConn::TcpSocketConn(uv_loop_t *loop, uv_tcp_t *tcp, bool ws, bool tls) : BaseSocket(loop, 0), tcp_(tcp)
 	{
 		tcp_->data = this;
 		if (ws)

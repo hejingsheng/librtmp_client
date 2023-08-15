@@ -53,16 +53,6 @@ namespace Dtls
 		ssl_ = NULL;
 		rbio_ = NULL;
 		wbio_ = NULL;
-
-#if OPENSSL_VERSION_NUMBER < 0x10100000L // v1.1.x
-		//SSL初库始化
-		SSL_library_init();
-		//载入所有SSL算法
-		OpenSSL_add_ssl_algorithms();
-		//载入所有错误信息
-		SSL_load_error_strings();
-#else
-#endif
 	}
 
 	DtlsBase::~DtlsBase()
@@ -541,27 +531,14 @@ namespace Dtls
 
 	void DtlsClient::stopNegotiation()
 	{
-		if (uv_is_active((uv_handle_t*)arqTimer_))
+		uv_timer_stop(arqTimer_);
+		uv_close((uv_handle_t*)arqTimer_,
+			[](uv_handle_t* handle)
 		{
-			uv_timer_stop(arqTimer_);
-		}
-		if (uv_is_closing((uv_handle_t*)arqTimer_) == 0)
-		{
-			uv_close((uv_handle_t*)arqTimer_,
-				[](uv_handle_t* handle)
-			{
-				auto ptr = static_cast<DtlsClient*>(handle->data);
-				//ptr->closeComplete();
-				ptr->onStopNegotiation();
-				//delete handle;
-			});
-		}
-		else
-		{
-			//closeComplete();
-			//close();
-			onStopNegotiation();
-		}
+			auto ptr = static_cast<DtlsClient*>(handle->data);
+			ILOG("dtls timer close finish\n");
+			ptr->onStopNegotiation();
+		});
 	}
 
 	void DtlsClient::onStopNegotiation()
